@@ -28,8 +28,7 @@ const Layout = () => {
 
     const challengesQuery = query(
       collection(db, 'challenges'),
-      where('userId', '==', auth.currentUser.uid),
-      orderBy('createdAt', 'desc')
+      where('userId', '==', auth.currentUser.uid)
     );
 
     const unsubscribeChallenges = onSnapshot(challengesQuery, (snapshot) => {
@@ -69,8 +68,7 @@ const Layout = () => {
 
     const messagesQuery = query(
       collection(db, 'messages'),
-      where('challengeId', '==', currentChallengeId),
-      orderBy('timestamp', 'asc')
+      where('challengeId', '==', currentChallengeId)
     );
 
     const unsubscribe = onSnapshot(messagesQuery, (snapshot) => {

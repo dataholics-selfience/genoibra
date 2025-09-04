@@ -272,7 +272,7 @@ const ChatInterface = ({ messages, addMessage, toggleSidebar, isSidebarOpen, cur
           scrollToBottom();
         }, 3000);
 
-        const webhookUrl = import.meta.env.VITE_WEBHOOK_URL || 'https://webhook.genoiapp.com/webhook/genoibra';
+        const webhookUrl = 'https://webhook.genoiapp.com/webhook/genoibra';
         const response = await fetch(webhookUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },

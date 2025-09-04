@@ -1,6 +1,6 @@
 export const API_CONFIG = {
   webhook: {
-    url: import.meta.env.VITE_WEBHOOK_URL || 'https://webhook.genoiapp.com/webhook/genoibra',
+    url: 'https://webhook.genoiapp.com/webhook/genoibra',
     headers: {
       'Content-Type': 'application/json'
     }
