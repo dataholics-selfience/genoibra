@@ -98,7 +98,7 @@ const GoogleRegisterComplete = () => {
         uid: googleUser.uid,
         email: googleUser.email.toLowerCase(),
         plan: 'Padawan',
-        totalTokens: 100,
+        totalTokens: 100000,
         usedTokens: 0,
         lastUpdated: new Date().toISOString(),
         expirationDate: expirationDate.toISOString()

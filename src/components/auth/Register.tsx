@@ -79,7 +79,7 @@ const Register = () => {
         uid: user.uid,
         email: formData.email.trim().toLowerCase(),
         plan: 'Padawan',
-        totalTokens: 100,
+        totalTokens: 100000,
         usedTokens: 0,
         lastUpdated: new Date().toISOString(),
         expirationDate: expirationDate.toISOString()
