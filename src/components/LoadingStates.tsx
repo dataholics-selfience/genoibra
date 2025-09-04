@@ -5,7 +5,6 @@ import { useTranslation } from '../utils/i18n';
 const LoadingStates = () => {
   const { t } = useTranslation();
   const [currentState, setCurrentState] = useState(0);
-  const [animationKey, setAnimationKey] = useState(0);
 
   const loadingStates = [
     {
@@ -43,7 +42,6 @@ const LoadingStates = () => {
   useEffect(() => {
     const interval = setInterval(() => {
       setCurrentState((prev) => (prev + 1) % loadingStates.length);
-      setAnimationKey(prev => prev + 1);
     }, 6000);
 
     return () => clearInterval(interval);
@@ -52,17 +50,11 @@ const LoadingStates = () => {
   const CurrentIcon = loadingStates[currentState].icon;
 
   return (
-    <div 
-      className="flex items-center gap-4 bg-gray-800/50 p-6 rounded-lg transform transition-all duration-500 animate-fade-in"
-      key={`loading-${animationKey}`}
-    >
+    <div className="flex items-center gap-4 bg-gray-800/50 p-6 rounded-lg transform transition-all duration-500 animate-fade-in">
       <CurrentIcon 
         className={`w-8 h-8 ${loadingStates[currentState].color} animate-pulse transform transition-all duration-500 scale-110`} 
       />
-      <span 
-        className="text-lg text-gray-300 animate-fade-in transition-all duration-500"
-        key={`text-${animationKey}`}
-      >
+      <span className="text-lg text-gray-300 animate-fade-in transition-all duration-500">
         {loadingStates[currentState].text}
       </span>
     </div>
