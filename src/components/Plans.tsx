@@ -24,7 +24,7 @@ const Plans = () => {
       name: 'Padawan',
       icon: Baby,
       description: t.padawanDescription || 'Plano para iniciantes que estão começando no caminho da inovação',
-      tokens: 100000,
+      tokens: 100,
       price: 0,
       highlight: false,
       stripeLink: ''
