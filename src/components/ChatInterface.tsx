@@ -6,13 +6,6 @@ import { auth, db } from '../firebase';
 import { MessageType, ChallengeType, TokenUsageType, StartupListType } from '../types';
 import { LoadingStates } from './LoadingStates';
 import { useTranslation } from '../utils/i18n';
-import { 
-  forceMessageUpdate, 
-  scrollToBottomWithDelay, 
-  hasSpecialButtons,
-  extractMessageContent,
-  generateMessageKey
-} from '../utils/messageUtils';
 
 interface ChatInterfaceProps {
   messages: MessageType[];
@@ -47,7 +40,7 @@ const ChatInterface = ({ messages, addMessage, toggleSidebar, isSidebarOpen, cur
   const [responseDelay, setResponseDelay] = useState<number>(0);
   const [isRecording, setIsRecording] = useState(false);
   const [recognition, setRecognition] = useState<any>(null);
-  const [messageKey, setMessageKey] = useState(0);
+  const [forceRender, setForceRender] = useState(0);
   
   const responseTimer = useRef<NodeJS.Timeout>();
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -64,12 +57,6 @@ const ChatInterface = ({ messages, addMessage, toggleSidebar, isSidebarOpen, cur
     scrollToBottom();
   }, [messages, isLoading]);
 
-  // Force scroll and re-render when messages change
-  useEffect(() => {
-    setMessageKey(prev => prev + 1);
-    setTimeout(scrollToBottom, 100);
-  }, [messages.length]);
-
   // Auto-scroll when loading animation appears
   useEffect(() => {
     if (isLoading && responseDelay > 0) {
@@ -81,7 +68,7 @@ const ChatInterface = ({ messages, addMessage, toggleSidebar, isSidebarOpen, cur
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (!document.hidden) {
-        setMessageKey(prev => prev + 1);
+        setForceRender(prev => prev + 1);
       }
     };
 
@@ -276,15 +263,8 @@ const ChatInterface = ({ messages, addMessage, toggleSidebar, isSidebarOpen, cur
         }
 
         if (!overrideMessage) {
-          // Add user message and force immediate update
-          await addMessage({ 
-            role: 'user', 
-            content: messageToSend,
-            messageId: crypto.randomUUID()
-          });
-          // Force immediate scroll and re-render
-          forceMessageUpdate(setMessageKey);
-          scrollToBottomWithDelay(messagesEndRef);
+          await addMessage({ role: 'user', content: messageToSend });
+          scrollToBottom();
         }
         
         responseTimer.current = setTimeout(() => {
@@ -326,7 +306,7 @@ const ChatInterface = ({ messages, addMessage, toggleSidebar, isSidebarOpen, cur
               return;
             }
 
-            const startupListRef = await addDoc(collection(db, 'startupLists'), {
+            await addDoc(collection(db, 'startupLists'), {
               userId: auth.currentUser.uid,
               userEmail: auth.currentUser.email,
               challengeId: currentChallenge.id,
@@ -335,39 +315,30 @@ const ChatInterface = ({ messages, addMessage, toggleSidebar, isSidebarOpen, cur
               createdAt: new Date().toISOString()
             });
 
-            console.log('Startup list created with ID:', startupListRef.id);
-
             await addMessage({
               role: 'assistant',
               content: `${t.viewCompleteList}\n\n<startup-list-button>${t.startupListButton}</startup-list-button>`,
-              messageId: crypto.randomUUID()
+              hidden: false
             });
 
-            // Force immediate re-render to ensure startup cards display properly
-            forceMessageUpdate(setMessageKey);
-            scrollToBottomWithDelay(messagesEndRef, 200);
+            // Force re-render to ensure startup cards display properly
+            setForceRender(prev => prev + 1);
           } else {
             await addMessage({ 
               role: 'assistant', 
               content: aiResponse,
-              hidden: !!overrideMessage,
-              messageId: crypto.randomUUID()
+              hidden: overrideMessage ? true : false
             });
-            // Force immediate scroll and re-render
-            forceMessageUpdate(setMessageKey);
-            scrollToBottomWithDelay(messagesEndRef);
+            scrollToBottom();
           }
         }
       } catch (error) {
         console.error('Error in chat:', error);
         await addMessage({
           role: 'assistant',
-          content: 'Desculpe, ocorreu um erro ao processar sua mensagem. Por favor, tente novamente.',
-          messageId: crypto.randomUUID()
+          content: 'Desculpe, ocorreu um erro ao processar sua mensagem. Por favor, tente novamente.'
         });
-        // Force immediate scroll and re-render
-        forceMessageUpdate(setMessageKey);
-        scrollToBottomWithDelay(messagesEndRef);
+        scrollToBottom();
       } finally {
         setIsLoading(false);
         if (responseTimer.current) {
@@ -410,12 +381,10 @@ const ChatInterface = ({ messages, addMessage, toggleSidebar, isSidebarOpen, cur
   }, []);
 
   const renderMessage = (message: MessageType) => {
-    const messageKey = generateMessageKey(message.id, message.timestamp, messageKey);
-    
     if (message.content.includes('<startup-list-button>')) {
       return (
-        <div className="space-y-4" key={messageKey}>
-          <p className="text-lg font-semibold">{extractMessageContent(message.content)}</p>
+        <div className="space-y-4" key={`${message.id}-${forceRender}`}>
+          <p className="text-lg font-semibold">{message.content.split('<startup-list-button>')[0]}</p>
           <Link
             to="/startups"
             className="inline-flex items-center gap-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white px-6 py-3 rounded-lg font-bold hover:from-blue-700 hover:to-purple-700 transition-all shadow-lg hover:shadow-xl"
@@ -429,8 +398,8 @@ const ChatInterface = ({ messages, addMessage, toggleSidebar, isSidebarOpen, cur
 
     if (message.content.includes('<upgrade-plan-button>')) {
       return (
-        <div className="space-y-4" key={messageKey}>
-          <p className="text-lg font-semibold">{extractMessageContent(message.content)}</p>
+        <div className="space-y-4" key={`${message.id}-${forceRender}`}>
+          <p className="text-lg font-semibold">{message.content.split('<upgrade-plan-button>')[0]}</p>
           <Link
             to="/plans"
             className="inline-block bg-gradient-to-r from-blue-600 to-purple-600 text-white px-6 py-3 rounded-lg font-bold hover:from-blue-700 hover:to-purple-700 transition-all shadow-lg hover:shadow-xl"
@@ -441,7 +410,7 @@ const ChatInterface = ({ messages, addMessage, toggleSidebar, isSidebarOpen, cur
       );
     }
 
-    return <p className="whitespace-pre-wrap text-lg font-semibold" key={messageKey}>{message.content}</p>;
+    return <p className="whitespace-pre-wrap text-lg font-semibold" key={`${message.id}-${forceRender}`}>{message.content}</p>;
   };
 
   const visibleMessages = messages.filter(message => !message.hidden);
@@ -528,7 +497,7 @@ const ChatInterface = ({ messages, addMessage, toggleSidebar, isSidebarOpen, cur
       <div className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar w-full">
         {visibleMessages.map((message) => (
           <div
-            key={`${message.id}-${messageKey}-${message.timestamp}`}
+            key={`${message.id}-${forceRender}`}
             className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'} w-full`}
           >
             <div
@@ -554,15 +523,13 @@ const ChatInterface = ({ messages, addMessage, toggleSidebar, isSidebarOpen, cur
                   </div>
                 </div>
               )}
-              <div key={`content-${message.id}-${messageKey}`}>
-                {renderMessage(message)}
-              </div>
+              {renderMessage(message)}
             </div>
           </div>
         ))}
         {isLoading && responseDelay > 0 && (
           <div className="flex justify-start w-full">
-            <div className="max-w-3xl w-full mr-8" key={`loading-${messageKey}`}>
+            <div className="max-w-3xl w-full mr-8">
               <LoadingStates />
             </div>
           </div>
@@ -621,7 +588,6 @@ const ChatInterface = ({ messages, addMessage, toggleSidebar, isSidebarOpen, cur
 const StartupListIcons = ({ challengeId }: { challengeId?: string }) => {
   const [startupLists, setStartupLists] = useState<StartupListType[]>([]);
   const [showAll, setShowAll] = useState(false);
-  const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
     const fetchStartupLists = async () => {
@@ -636,7 +602,6 @@ const StartupListIcons = ({ challengeId }: { challengeId?: string }) => {
         setStartupLists(querySnapshot.docs.map(
           doc => ({ id: doc.id, ...doc.data() } as StartupListType)
         ));
-        setRefreshKey(prev => prev + 1);
       } catch (error) {
         console.error('Error fetching startup lists:', error);
       }
@@ -650,10 +615,10 @@ const StartupListIcons = ({ challengeId }: { challengeId?: string }) => {
   const visibleLists = showAll ? startupLists : startupLists.slice(0, 3);
 
   return (
-    <div className="flex -space-x-2" key={`startup-icons-${refreshKey}`}>
+    <div className="flex -space-x-2">
       {visibleLists.map((list) => (
         <Link
-          key={`${list.id}-${refreshKey}`}
+          key={list.id}
           to="/startups"
           className="relative group"
         >
@@ -663,7 +628,7 @@ const StartupListIcons = ({ challengeId }: { challengeId?: string }) => {
           <div className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-xs rounded-full flex items-center justify-center font-bold">
             {list.startups?.length || 0}
           </div>
-          <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-gray-800 text-xs text-white rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-20">
+          <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-gray-800 text-xs text-white rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10">
             {list.startups?.length || 0} startups
           </div>
         </Link>

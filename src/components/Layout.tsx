@@ -19,7 +19,6 @@ const Layout = () => {
   const [challenges, setChallenges] = useState<ChallengeType[]>([]);
   const [currentChallengeId, setCurrentChallengeId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [messageRefresh, setMessageRefresh] = useState(0);
 
   useEffect(() => {
     if (!auth.currentUser) {
@@ -78,7 +77,6 @@ const Layout = () => {
         ...doc.data()
       })) as MessageType[];
       setMessages(newMessages);
-      setMessageRefresh(prev => prev + 1);
     });
 
     return () => unsubscribe();
@@ -95,15 +93,11 @@ const Layout = () => {
       ...message,
       timestamp: new Date().toISOString(),
       userId: auth.currentUser.uid,
-      challengeId: currentChallengeId,
-      messageId: message.messageId || crypto.randomUUID()
+      challengeId: currentChallengeId
     };
 
     try {
-      const docRef = await addDoc(collection(db, 'messages'), newMessage);
-      console.log('Message added with ID:', docRef.id);
-      // Force refresh to ensure message appears
-      setMessageRefresh(prev => prev + 1);
+      await addDoc(collection(db, 'messages'), newMessage);
     } catch (error) {
       console.error('Error adding message:', error);
     }
@@ -139,7 +133,6 @@ const Layout = () => {
         toggleSidebar={toggleSidebar}
         isSidebarOpen={isSidebarOpen}
         currentChallenge={challenges.find(c => c.id === currentChallengeId)}
-        key={`chat-${messageRefresh}`}
       />
     </div>
   );
