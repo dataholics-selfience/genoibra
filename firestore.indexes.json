@@ -101,5 +101,24 @@
       ]
     }
   ],
+  {
+    "collectionGroup": "messages",
+    "queryScope": "COLLECTION",
+    "fields": [
+      {
+        "fieldPath": "challengeId",
+        "order": "ASCENDING"
+      },
+      {
+        "fieldPath": "timestamp",
+        "order": "ASCENDING"
+      },
+      {
+        "fieldPath": "__name__",
+        "order": "ASCENDING"
+      }
+    ]
+  }
+ ],
   "fieldOverrides": []
 }

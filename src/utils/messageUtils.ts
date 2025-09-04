@@ -33,17 +33,20 @@ export const scrollToBottomWithDelay = (
  * Verifica se uma mensagem contém botões especiais
  */
 export const hasSpecialButtons = (content: string): boolean => {
-  return content.includes('<startup-list-button>') || content.includes('<upgrade-plan-button>');
+  return content.includes('<startup-list-button>') || 
+         content.includes('<upgrade-plan-button>') ||
+         content.includes('startup-list-button') || 
+         content.includes('upgrade-plan-button');
 };
 
 /**
  * Extrai o conteúdo antes dos botões especiais
  */
 export const extractMessageContent = (content: string): string => {
-  if (content.includes('<startup-list-button>')) {
+  if (content.includes('<startup-list-button>') || content.includes('startup-list-button')) {
     return content.split('<startup-list-button>')[0];
   }
-  if (content.includes('<upgrade-plan-button>')) {
+  if (content.includes('<upgrade-plan-button>') || content.includes('upgrade-plan-button')) {
     return content.split('<upgrade-plan-button>')[0];
   }
   return content;

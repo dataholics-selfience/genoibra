@@ -384,10 +384,10 @@ const ChatInterface = ({ messages, addMessage, toggleSidebar, isSidebarOpen, cur
   }, []);
 
   const renderMessage = (message: MessageType) => {
-    if (message.content.includes('<startup-list-button>')) {
+    if (message.content.includes('<startup-list-button>') || message.content.includes('startup-list-button')) {
       return (
         <div className="space-y-4" key={`${message.id}-${forceRender}`}>
-          <p className="text-lg font-semibold">{message.content.split('<startup-list-button>')[0]}</p>
+          <p className="text-lg font-semibold">{message.content.split('<startup-list-button>')[0].split('startup-list-button')[0]}</p>
           <Link
             to="/startups"
             className="inline-flex items-center gap-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white px-6 py-3 rounded-lg font-bold hover:from-blue-700 hover:to-purple-700 transition-all shadow-lg hover:shadow-xl"
@@ -399,10 +399,10 @@ const ChatInterface = ({ messages, addMessage, toggleSidebar, isSidebarOpen, cur
       );
     }
 
-    if (message.content.includes('<upgrade-plan-button>')) {
+    if (message.content.includes('<upgrade-plan-button>') || message.content.includes('upgrade-plan-button')) {
       return (
         <div className="space-y-4" key={`${message.id}-${forceRender}`}>
-          <p className="text-lg font-semibold">{message.content.split('<upgrade-plan-button>')[0]}</p>
+          <p className="text-lg font-semibold">{message.content.split('<upgrade-plan-button>')[0].split('upgrade-plan-button')[0]}</p>
           <Link
             to="/plans"
             className="inline-block bg-gradient-to-r from-blue-600 to-purple-600 text-white px-6 py-3 rounded-lg font-bold hover:from-blue-700 hover:to-purple-700 transition-all shadow-lg hover:shadow-xl"

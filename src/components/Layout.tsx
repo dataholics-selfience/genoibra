@@ -68,8 +68,7 @@ const Layout = () => {
 
     const messagesQuery = query(
       collection(db, 'messages'),
-      where('challengeId', '==', currentChallengeId),
-      orderBy('timestamp', 'asc')
+      where('challengeId', '==', currentChallengeId)
     );
 
     const unsubscribe = onSnapshot(messagesQuery, (snapshot) => {
@@ -77,6 +76,10 @@ const Layout = () => {
         id: doc.id,
         ...doc.data()
       })) as MessageType[];
+      
+      // Sort messages by timestamp in ascending order
+      newMessages.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+      
       setMessages(newMessages);
     });
 
