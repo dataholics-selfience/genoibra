@@ -12,7 +12,6 @@ import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import PipelineStageManager from './PipelineStageManager';
 import { Link } from 'react-router-dom';
-import { Target } from 'lucide-react';
 
 interface SavedStartupType {
   id: string;
