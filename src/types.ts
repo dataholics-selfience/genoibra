@@ -7,7 +7,7 @@ export interface MessageType {
   timestamp: string;
   challengeId?: string;
   hidden?: boolean;
-  messageId?: string;
+  messageId: string;
 }
 
 export interface ChallengeType {

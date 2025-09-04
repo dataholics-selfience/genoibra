@@ -53,7 +53,6 @@ const UserProfile = ({ hideText = false }: UserProfileProps) => {
         <div className="flex flex-col">
           <div className="flex items-center gap-2">
             <span className="text-sm font-medium text-gray-300">{firstName}</span>
-            <span className="text-xs text-gray-400">({userData.plan || 'Padawan'})</span>
           </div>
           {tokenUsage && (
             <div className="text-xs">
