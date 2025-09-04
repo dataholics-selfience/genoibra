@@ -14,7 +14,9 @@ const NewChallenge = () => {
     title: '',
     description: '',
     businessArea: '',
-    companyName: ''
+    companyName: '',
+    companyType: 'bradesco', // 'bradesco' ou 'habitante'
+    habitanteCompany: ''
   });
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -66,6 +68,13 @@ const NewChallenge = () => {
     }));
   };
 
+  const handleSelectChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -94,11 +103,15 @@ const NewChallenge = () => {
       const firstName = userData.name?.split(' ')[0] || '';
       const sessionId = uuidv4().replace(/-/g, '');
 
+      // Determinar qual empresa usar
+      const companyToUse = formData.companyType === 'bradesco' 
+        ? 'Bradesco' 
+        : formData.habitanteCompany || 'Empresa Habitante';
 
       const challengeData = {
         userId: auth.currentUser.uid,
         userEmail: auth.currentUser.email,
-        company: userData.company,
+        company: companyToUse,
         businessArea: formData.businessArea,
         title: formData.title,
         description: formData.description,
@@ -109,7 +122,7 @@ const NewChallenge = () => {
 
       const challengeRef = await addDoc(collection(db, 'challenges'), challengeData);
 
-      const message = `Eu sou ${firstName}, um profissional gestor antenado nas novidades e que curte uma fala informal e ao mesmo tempo séria nos assuntos relativos ao Desafio. Eu trabalho na empresa ${userData.company || ''} que atua na área de ${formData.businessArea}. O meu desafio é ${formData.title} e a descrição do desafio é ${formData.description}. Faça uma breve saudação bem humorada e criativa que remete à cultura Geek e que tenha ligação direta com o desafio proposto. Depois, faça de forma direta uma pergunta sobre o ambiente interno de negócios do cliente, ou seja, sobre sua própria infraestrutura tecnológica, sobre sua operação, sobre os valores envolvidos na perda, ou sobre as possibilidades concretas de implantar a inovação nos processos, sistemas, rotinas ou maquinário - pesquise na internet e seja inteligente ao formular uma linha de questionamento bem embasada, conhecendo muito bem a área de atuação e qual empresa o cliente está representando. Uma pergunta inusitada e útil o suficiente para reforçar a descrição do desafio, com enfoque no ambiente interno da ${userData.company || ''} e seu estágio no quesito de transformação digital.`;
+      const message = `Eu sou ${firstName}, um profissional gestor antenado nas novidades e que curte uma fala informal e ao mesmo tempo séria nos assuntos relativos ao Desafio. Eu trabalho na empresa ${companyToUse} que atua na área de ${formData.businessArea}. O meu desafio é ${formData.title} e a descrição do desafio é ${formData.description}. Faça uma breve saudação bem humorada e criativa que remete à cultura Geek e que tenha ligação direta com o desafio proposto. Depois, faça de forma direta uma pergunta sobre o ambiente interno de negócios do cliente, ou seja, sobre sua própria infraestrutura tecnológica, sobre sua operação, sobre os valores envolvidos na perda, ou sobre as possibilidades concretas de implantar a inovação nos processos, sistemas, rotinas ou maquinário - pesquise na internet e seja inteligente ao formular uma linha de questionamento bem embasada, conhecendo muito bem a área de atuação e qual empresa o cliente está representando. Uma pergunta inusitada e útil o suficiente para reforçar a descrição do desafio, com enfoque no ambiente interno da ${companyToUse} e seu estágio no quesito de transformação digital.`;
 
       console.log('Sending webhook message:', {
         sessionId,
@@ -213,6 +226,39 @@ const NewChallenge = () => {
                 placeholder="Ex: Tecnologia, Saúde, Educação"
               />
             </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-2">
+                Empresa
+              </label>
+              <select
+                name="companyType"
+                value={formData.companyType}
+                onChange={handleSelectChange}
+                required
+                className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="bradesco">Bradesco</option>
+                <option value="habitante">Empresa Habitante</option>
+              </select>
+            </div>
+
+            {formData.companyType === 'habitante' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Nome da Empresa Habitante
+                </label>
+                <input
+                  type="text"
+                  name="habitanteCompany"
+                  value={formData.habitanteCompany}
+                  onChange={handleChange}
+                  required
+                  className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Digite o nome da empresa habitante"
+                />
+              </div>
+            )}
 
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-2">

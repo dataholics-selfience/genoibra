@@ -11,6 +11,8 @@ import { StartupType, SocialLink } from '../types';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import PipelineStageManager from './PipelineStageManager';
+import { Link } from 'react-router-dom';
+import { Target } from 'lucide-react';
 
 interface SavedStartupType {
   id: string;
@@ -740,28 +742,7 @@ const SavedStartups = () => {
       <div className="p-4 lg:p-8">
         <div className="max-w-7xl mx-auto">
           {totalStartupCount === 0 ? (
-            <div className="text-center py-16">
-              <FolderOpen size={64} className="text-gray-600 mx-auto mb-4" />
-              <h3 className="text-xl font-bold text-white mb-2">Pipeline vazio</h3>
-              <p className="text-gray-400 mb-6">
-                Você ainda não tem startups no seu pipeline. Explore as listas de startups e adicione suas favoritas, 
-                ou aguarde inscrições em seus desafios públicos.
-              </p>
-              <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                <button
-                  onClick={() => navigate('/startups')}
-                  className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-medium transition-colors"
-                >
-                  Explorar Startups
-                </button>
-                <button
-                  onClick={() => navigate('/new-challenge')}
-                  className="bg-purple-600 hover:bg-purple-700 text-white px-6 py-3 rounded-lg font-medium transition-colors"
-                >
-                  Criar Desafio Público
-                </button>
-              </div>
-            </div>
+            <EmptyPipelineSection />
           ) : (
             <>
               {publicRegistrations > 0 && (
@@ -789,6 +770,85 @@ const SavedStartups = () => {
             </>
           )}
         </div>
+      </div>
+    </div>
+  );
+};
+
+const ChallengeButton = ({ challenge }: { challenge: any }) => {
+  return (
+    <Link
+      to={`/challenge/${challenge.slug || challenge.id}`}
+      className="bg-purple-600 hover:bg-purple-700 text-white px-6 py-3 rounded-lg font-medium transition-colors flex items-center gap-2"
+    >
+      <Target size={20} />
+      {challenge.title}
+    </Link>
+  );
+};
+
+const EmptyPipelineSection = () => {
+  const [challenges, setChallenges] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchChallenges = async () => {
+      if (!auth.currentUser) return;
+
+      try {
+        const q = query(
+          collection(db, 'challenges'),
+          where('userId', '==', auth.currentUser.uid)
+        );
+        const querySnapshot = await getDocs(q);
+        const userChallenges = querySnapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+        setChallenges(userChallenges);
+      } catch (error) {
+        console.error('Error fetching challenges:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchChallenges();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="text-center py-16">
+        <div className="animate-pulse text-white text-lg">Carregando...</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="text-center py-16">
+      <FolderOpen size={64} className="text-gray-600 mx-auto mb-4" />
+      <h3 className="text-xl font-bold text-white mb-2">Pipeline vazio</h3>
+      <p className="text-gray-400 mb-6">
+        Você ainda não tem startups no seu pipeline. Crie desafios para atrair startups 
+        ou aguarde inscrições em seus desafios públicos.
+      </p>
+      <div className="flex flex-col sm:flex-row gap-4 justify-center">
+        {challenges.length > 0 && (
+          <div className="flex flex-col gap-3 mb-4">
+            <h4 className="text-lg font-medium text-white">Seus Desafios:</h4>
+            <div className="flex flex-wrap gap-3 justify-center">
+              {challenges.map((challenge) => (
+                <ChallengeButton key={challenge.id} challenge={challenge} />
+              ))}
+            </div>
+          </div>
+        )}
+        <button
+          onClick={() => navigate('/new-challenge')}
+          className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-medium transition-colors"
+        >
+          Criar Desafio
+        </button>
       </div>
     </div>
   );

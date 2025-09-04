@@ -55,7 +55,7 @@ const Register = () => {
   const [formData, setFormData] = useState({
     name: '',
     cpf: '',
-    company: '',
+    company: 'bradesco', // Default para Bradesco
     email: '',
     phone: '',
     password: '',
@@ -197,6 +197,14 @@ const Register = () => {
     }));
   };
 
+  const handleSelectChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
   return (
     <div className="min-h-screen bg-black flex items-center justify-center p-4">
       <RestrictedAccessModal 
@@ -229,15 +237,16 @@ const Register = () => {
               className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
               placeholder={t.cpf}
             />
-            <input
-              type="text"
+            <select
               name="company"
-              required
               value={formData.company}
-              onChange={handleChange}
+              onChange={handleSelectChange}
+              required
               className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder={t.company}
-            />
+            >
+              <option value="bradesco">Bradesco</option>
+              <option value="habitat">Habitat</option>
+            </select>
             <input
               type="email"
               name="email"
@@ -276,7 +285,7 @@ const Register = () => {
                 required
               />
               <label className="ml-2 block text-sm text-gray-300">
-                {t.acceptTerms}
+                Declaro que faço parte do Bradesco ou inovaBra habitat
               </label>
             </div>
           </div>
