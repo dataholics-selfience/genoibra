@@ -1,20 +1,20 @@
 export const API_CONFIG = {
   webhook: {
-    url: 'https://primary-production-2e3b.up.railway.app/webhook/production',
+    url: import.meta.env.VITE_WEBHOOK_URL || 'https://webhook.genoiapp.com/webhook/genoibra',
     headers: {
       'Content-Type': 'application/json'
     }
   },
   adminWebhooks: {
     test: {
-      list: '/admin-api/webhook-test/capta-startups',
-      delete: '/admin-api/webhook-test/deleta-startups',
-      search: '/admin-api/webhook-test/busca-startups'
+      list: 'https://webhook.genoiapp.com/admin-api/webhook-test/capta-startups',
+      delete: 'https://webhook.genoiapp.com/admin-api/webhook-test/deleta-startups',
+      search: 'https://webhook.genoiapp.com/admin-api/webhook-test/busca-startups'
     },
     production: {
-      list: '/admin-api/webhook/capta-startups',
-      delete: '/admin-api/webhook/deleta-startups',
-      search: '/admin-api/webhook/busca-startups'
+      list: 'https://webhook.genoiapp.com/admin-api/webhook/capta-startups',
+      delete: 'https://webhook.genoiapp.com/admin-api/webhook/deleta-startups',
+      search: 'https://webhook.genoiapp.com/admin-api/webhook/busca-startups'
     }
   }
 };

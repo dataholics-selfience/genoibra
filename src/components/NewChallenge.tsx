@@ -199,7 +199,8 @@ const NewChallenge = () => {
         challengeId: challengeRef.id
       });
 
-      const response = await fetch('https://primary-production-2e3b.up.railway.app/webhook/production', {
+      const webhookUrl = import.meta.env.VITE_WEBHOOK_URL || 'https://webhook.genoiapp.com/webhook/genoibra';
+      const response = await fetch(webhookUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

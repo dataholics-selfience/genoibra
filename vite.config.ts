@@ -24,7 +24,7 @@ export default defineConfig({
   server: {
     proxy: {
       '/admin-api': {
-        target: 'https://primary-production-2e3b.up.railway.app',
+        target: 'https://webhook.genoiapp.com',
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/admin-api/, '')
       }
