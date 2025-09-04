@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Edit2, Plus, Save, X, Trash2, GripVertical, MessageSquare, Mail, Smartphone, ArrowLeft, Copy } from 'lucide-react';
+import { Edit2, Plus, Save, X, Trash2, GripVertical } from 'lucide-react';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db, auth } from '../firebase';
 
@@ -8,9 +8,6 @@ interface PipelineStage {
   name: string;
   color: string;
   order: number;
-  emailTemplate?: string;
-  emailSubject?: string;
-  whatsappTemplate?: string;
 }
 
 interface PipelineStageManagerProps {
@@ -22,46 +19,31 @@ const DEFAULT_STAGES: PipelineStage[] = [
     id: 'mapeada', 
     name: 'Mapeada', 
     color: 'bg-yellow-200 text-yellow-800 border-yellow-300', 
-    order: 0,
-    emailTemplate: '',
-    emailSubject: '',
-    whatsappTemplate: ''
+    order: 0
   },
   { 
     id: 'selecionada', 
     name: 'Selecionada', 
     color: 'bg-blue-200 text-blue-800 border-blue-300', 
-    order: 1,
-    emailTemplate: '',
-    emailSubject: '',
-    whatsappTemplate: ''
+    order: 1
   },
   { 
     id: 'contatada', 
     name: 'Contatada', 
     color: 'bg-red-200 text-red-800 border-red-300', 
-    order: 2,
-    emailTemplate: '',
-    emailSubject: '',
-    whatsappTemplate: ''
+    order: 2
   },
   { 
     id: 'entrevistada', 
     name: 'Entrevistada', 
     color: 'bg-green-200 text-green-800 border-green-300', 
-    order: 3,
-    emailTemplate: '',
-    emailSubject: '',
-    whatsappTemplate: ''
+    order: 3
   },
   { 
     id: 'poc', 
     name: 'POC', 
     color: 'bg-orange-200 text-orange-800 border-orange-300', 
-    order: 4,
-    emailTemplate: '',
-    emailSubject: '',
-    whatsappTemplate: ''
+    order: 4
   }
 ];
 
@@ -77,235 +59,6 @@ const COLOR_OPTIONS = [
   { value: 'bg-gray-200 text-gray-800 border-gray-300', label: 'Cinza' }
 ];
 
-const VARIABLES = [
-  { key: '{{startupName}}', label: 'Nome da startup', description: 'Nome da startup selecionada' },
-  { key: '{{senderName}}', label: 'Seu nome', description: 'Nome do remetente da mensagem' },
-  { key: '{{senderCompany}}', label: 'Sua empresa', description: 'Nome da sua empresa' },
-  { key: '{{recipientName}}', label: 'Nome do contato', description: 'Nome do contato da startup' }
-];
-
-const DraggableVariable = ({ variable, onDragStart }: { 
-  variable: typeof VARIABLES[0]; 
-  onDragStart: (variable: string) => void;
-}) => {
-  const handleDragStart = (e: React.DragEvent) => {
-    e.dataTransfer.setData('text/plain', variable.key);
-    onDragStart(variable.key);
-  };
-
-  const handleCopy = () => {
-    navigator.clipboard.writeText(variable.key);
-  };
-
-  return (
-    <div
-      draggable
-      onDragStart={handleDragStart}
-      className="group flex items-center justify-between bg-blue-800/30 border border-blue-600/50 rounded-lg p-3 cursor-move hover:bg-blue-700/40 transition-colors"
-    >
-      <div className="flex items-center gap-3">
-        <GripVertical size={16} className="text-blue-400 group-hover:text-blue-300" />
-        <div>
-          <code className="text-blue-300 font-mono text-sm">{variable.key}</code>
-          <p className="text-blue-200 text-xs mt-1">{variable.description}</p>
-        </div>
-      </div>
-      <button
-        onClick={handleCopy}
-        className="opacity-0 group-hover:opacity-100 p-1 text-blue-400 hover:text-blue-300 transition-all"
-        title="Copiar variável"
-      >
-        <Copy size={14} />
-      </button>
-    </div>
-  );
-};
-
-const MessageTemplatePage = ({ 
-  stage, 
-  onSave, 
-  onBack 
-}: { 
-  stage: PipelineStage; 
-  onSave: (stage: PipelineStage) => void; 
-  onBack: () => void; 
-}) => {
-  const [emailSubject, setEmailSubject] = useState(stage.emailSubject || '');
-  const [emailTemplate, setEmailTemplate] = useState(stage.emailTemplate || '');
-  const [whatsappTemplate, setWhatsappTemplate] = useState(stage.whatsappTemplate || '');
-  const [draggedVariable, setDraggedVariable] = useState<string | null>(null);
-
-  const handleSave = () => {
-    onSave({
-      ...stage,
-      emailSubject,
-      emailTemplate,
-      whatsappTemplate
-    });
-    onBack();
-  };
-
-  const handleDrop = (e: React.DragEvent, field: 'subject' | 'email' | 'whatsapp') => {
-    e.preventDefault();
-    const variable = e.dataTransfer.getData('text/plain');
-    
-    if (variable) {
-      const textarea = e.target as HTMLTextAreaElement | HTMLInputElement;
-      const start = textarea.selectionStart || 0;
-      const end = textarea.selectionEnd || 0;
-      const currentValue = field === 'subject' ? emailSubject : 
-                          field === 'email' ? emailTemplate : whatsappTemplate;
-      
-      const newValue = currentValue.substring(0, start) + variable + currentValue.substring(end);
-      
-      if (field === 'subject') {
-        setEmailSubject(newValue);
-      } else if (field === 'email') {
-        setEmailTemplate(newValue);
-      } else {
-        setWhatsappTemplate(newValue);
-      }
-      
-      // Focus back to textarea and position cursor after inserted variable
-      setTimeout(() => {
-        textarea.focus();
-        textarea.setSelectionRange(start + variable.length, start + variable.length);
-      }, 0);
-    }
-  };
-
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-  };
-
-  return (
-    <div className="min-h-screen bg-gray-900 p-6">
-      <div className="max-w-6xl mx-auto">
-        {/* Header */}
-        <div className="flex items-center gap-4 mb-8">
-          <button
-            onClick={onBack}
-            className="flex items-center gap-2 text-gray-400 hover:text-white transition-colors"
-          >
-            <ArrowLeft size={20} />
-            Voltar
-          </button>
-          <div>
-            <h1 className="text-2xl font-bold text-white">
-              Configurar Mensagens - {stage.name}
-            </h1>
-            <p className="text-gray-400 mt-1">
-              Configure os modelos de mensagens automáticas para este estágio
-            </p>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-          {/* Variables Sidebar */}
-          <div className="lg:col-span-1">
-            <div className="bg-blue-900/20 border border-blue-600 rounded-lg p-6 sticky top-6">
-              <h4 className="text-blue-200 font-medium mb-4 flex items-center gap-2">
-                <MessageSquare size={20} />
-                Variáveis Disponíveis
-              </h4>
-              <p className="text-blue-300 text-sm mb-4">
-                Arraste as variáveis para os campos de texto
-              </p>
-              <div className="space-y-3">
-                {VARIABLES.map((variable) => (
-                  <DraggableVariable
-                    key={variable.key}
-                    variable={variable}
-                    onDragStart={setDraggedVariable}
-                  />
-                ))}
-              </div>
-            </div>
-          </div>
-
-          {/* Templates */}
-          <div className="lg:col-span-3 space-y-8">
-            {/* Email Template */}
-            <div className="bg-gray-800 rounded-lg p-6">
-              <div className="flex items-center gap-3 mb-6">
-                <Mail size={24} className="text-blue-400" />
-                <h3 className="text-xl font-semibold text-white">Modelo de Email</h3>
-              </div>
-              
-              {/* Email Subject */}
-              <div className="mb-6">
-                <label className="block text-sm font-medium text-gray-300 mb-2">
-                  Assunto do Email
-                </label>
-                <input
-                  type="text"
-                  value={emailSubject}
-                  onChange={(e) => setEmailSubject(e.target.value)}
-                  onDrop={(e) => handleDrop(e, 'subject')}
-                  onDragOver={handleDragOver}
-                  className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm"
-                  placeholder="Digite o assunto do email..."
-                />
-              </div>
-
-              {/* Email Body */}
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
-                  Corpo do Email
-                </label>
-                <textarea
-                  value={emailTemplate}
-                  onChange={(e) => setEmailTemplate(e.target.value)}
-                  onDrop={(e) => handleDrop(e, 'email')}
-                  onDragOver={handleDragOver}
-                  rows={15}
-                  className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none font-mono text-sm leading-relaxed"
-                  placeholder="Digite o modelo de email para esta etapa..."
-                />
-              </div>
-            </div>
-
-            {/* WhatsApp Template */}
-            <div className="bg-gray-800 rounded-lg p-6">
-              <div className="flex items-center gap-3 mb-4">
-                <Smartphone size={24} className="text-green-400" />
-                <h3 className="text-xl font-semibold text-white">Modelo de WhatsApp</h3>
-              </div>
-              <textarea
-                value={whatsappTemplate}
-                onChange={(e) => setWhatsappTemplate(e.target.value)}
-                onDrop={(e) => handleDrop(e, 'whatsapp')}
-                onDragOver={handleDragOver}
-                rows={8}
-                className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none font-mono text-sm leading-relaxed"
-                placeholder="Digite o modelo de WhatsApp para esta etapa..."
-              />
-            </div>
-
-            {/* Action Buttons */}
-            <div className="flex gap-4 pt-6 border-t border-gray-700">
-              <button
-                onClick={handleSave}
-                className="flex items-center gap-2 px-8 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors font-medium"
-              >
-                <Save size={18} />
-                Salvar Modelos
-              </button>
-              <button
-                onClick={onBack}
-                className="flex items-center gap-2 px-8 py-3 bg-gray-600 hover:bg-gray-700 text-white rounded-lg transition-colors font-medium"
-              >
-                <X size={18} />
-                Cancelar
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
-
 const DraggableStageItem = ({ 
   stage, 
   editingStage, 
@@ -313,7 +66,6 @@ const DraggableStageItem = ({
   onSave, 
   onCancel, 
   onDelete, 
-  onConfigureMessages,
   canDelete,
   onDragStart,
   onDragOver,
@@ -326,7 +78,6 @@ const DraggableStageItem = ({
   onSave: () => void;
   onCancel: () => void;
   onDelete: (stageId: string) => void;
-  onConfigureMessages: (stage: PipelineStage) => void;
   canDelete: boolean;
   onDragStart: (e: React.DragEvent, stage: PipelineStage) => void;
   onDragOver: (e: React.DragEvent) => void;
@@ -353,8 +104,6 @@ const DraggableStageItem = ({
     const bgColor = colorClass.split(' ')[0].replace('bg-', '');
     return `bg-${bgColor}`;
   };
-
-  const hasTemplates = stage.emailTemplate || stage.whatsappTemplate;
 
   return (
     <div
@@ -413,21 +162,8 @@ const DraggableStageItem = ({
             </span>
             <div className={`w-6 h-6 rounded-full ${getColorPreview(stage.color)}`} />
             <span className="text-sm text-gray-400">Ordem: {stage.order + 1}</span>
-            {hasTemplates && (
-              <div className="flex items-center gap-1">
-                {stage.emailTemplate && <Mail size={14} className="text-blue-400" />}
-                {stage.whatsappTemplate && <Smartphone size={14} className="text-green-400" />}
-              </div>
-            )}
           </div>
           <div className="flex gap-2">
-            <button
-              onClick={() => onConfigureMessages(stage)}
-              className="text-gray-400 hover:text-white p-2 rounded-lg hover:bg-gray-600 transition-colors"
-              title="Configurar mensagens automáticas"
-            >
-              <MessageSquare size={16} />
-            </button>
             <button
               onClick={() => onEdit(stage)}
               className="text-gray-400 hover:text-white p-2 rounded-lg hover:bg-gray-600 transition-colors"
@@ -453,13 +189,9 @@ const PipelineStageManager = ({ onStagesUpdate }: PipelineStageManagerProps) => 
   const [stages, setStages] = useState<PipelineStage[]>(DEFAULT_STAGES);
   const [editingStage, setEditingStage] = useState<PipelineStage | null>(null);
   const [showAddStage, setShowAddStage] = useState(false);
-  const [showMessagePage, setShowMessagePage] = useState<PipelineStage | null>(null);
   const [newStage, setNewStage] = useState<Partial<PipelineStage>>({
     name: '',
-    color: COLOR_OPTIONS[0].value,
-    emailTemplate: '',
-    emailSubject: '',
-    whatsappTemplate: ''
+    color: COLOR_OPTIONS[0].value
   });
   const [draggedStage, setDraggedStage] = useState<PipelineStage | null>(null);
   const [dragOverStage, setDragOverStage] = useState<string | null>(null);
@@ -527,10 +259,7 @@ const PipelineStageManager = ({ onStagesUpdate }: PipelineStageManagerProps) => 
       id: Date.now().toString(),
       name: newStage.name,
       color: newStage.color || COLOR_OPTIONS[0].value,
-      order: stages.length,
-      emailTemplate: newStage.emailTemplate || '',
-      emailSubject: newStage.emailSubject || '',
-      whatsappTemplate: newStage.whatsappTemplate || ''
+      order: stages.length
     };
 
     const updatedStages = [...stages, stageToAdd];
@@ -538,10 +267,7 @@ const PipelineStageManager = ({ onStagesUpdate }: PipelineStageManagerProps) => 
     
     setNewStage({ 
       name: '', 
-      color: COLOR_OPTIONS[0].value,
-      emailTemplate: '',
-      emailSubject: '',
-      whatsappTemplate: ''
+      color: COLOR_OPTIONS[0].value
     });
     setShowAddStage(false);
   };
@@ -550,18 +276,6 @@ const PipelineStageManager = ({ onStagesUpdate }: PipelineStageManagerProps) => 
     if (stages.length <= 1) return; // Don't allow deleting the last stage
     
     const updatedStages = stages.filter(stage => stage.id !== stageId);
-    await saveStages(updatedStages);
-  };
-
-  const handleConfigureMessages = (stage: PipelineStage) => {
-    setShowMessagePage(stage);
-  };
-
-  const handleSaveMessageTemplates = async (updatedStage: PipelineStage) => {
-    const updatedStages = stages.map(stage =>
-      stage.id === updatedStage.id ? updatedStage : stage
-    );
-    
     await saveStages(updatedStages);
   };
 
@@ -614,17 +328,6 @@ const PipelineStageManager = ({ onStagesUpdate }: PipelineStageManagerProps) => 
 
   const sortedStages = [...stages].sort((a, b) => a.order - b.order);
 
-  // Show message template page if selected
-  if (showMessagePage) {
-    return (
-      <MessageTemplatePage
-        stage={showMessagePage}
-        onSave={handleSaveMessageTemplates}
-        onBack={() => setShowMessagePage(null)}
-      />
-    );
-  }
-
   return (
     <div className="bg-gray-800 rounded-lg p-6">
       <div className="flex items-center justify-between mb-6">
@@ -640,11 +343,8 @@ const PipelineStageManager = ({ onStagesUpdate }: PipelineStageManagerProps) => 
 
       {/* Instructions */}
       <div className="bg-blue-900/20 border border-blue-600 rounded-lg p-4 mb-6">
-        <p className="text-blue-200 text-sm mb-2">
-          💡 <strong>Dica:</strong> Arraste os estágios usando o ícone <GripVertical size={16} className="inline mx-1" /> para reordenar a sequência do pipeline.
-        </p>
         <p className="text-blue-200 text-sm">
-          📧 Use o ícone <MessageSquare size={16} className="inline mx-1" /> para configurar mensagens automáticas que serão enviadas quando uma startup for movida para o estágio.
+          💡 <strong>Dica:</strong> Arraste os estágios usando o ícone <GripVertical size={16} className="inline mx-1" /> para reordenar a sequência do pipeline.
         </p>
       </div>
 
@@ -686,10 +386,7 @@ const PipelineStageManager = ({ onStagesUpdate }: PipelineStageManagerProps) => 
                 setShowAddStage(false);
                 setNewStage({ 
                   name: '', 
-                  color: COLOR_OPTIONS[0].value,
-                  emailTemplate: '',
-                  emailSubject: '',
-                  whatsappTemplate: ''
+                  color: COLOR_OPTIONS[0].value
                 });
               }}
               className="flex items-center gap-2 px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg transition-colors"
@@ -712,7 +409,6 @@ const PipelineStageManager = ({ onStagesUpdate }: PipelineStageManagerProps) => 
             onSave={handleEditStage}
             onCancel={() => setEditingStage(null)}
             onDelete={handleDeleteStage}
-            onConfigureMessages={handleConfigureMessages}
             canDelete={stages.length > 1}
             onDragStart={handleDragStart}
             onDragOver={handleDragOver}

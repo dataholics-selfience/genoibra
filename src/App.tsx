@@ -15,9 +15,6 @@ import EmailVerification from './components/auth/EmailVerification';
 import AccountDeleted from './components/AccountDeleted';
 import StartupList from './components/StartupList';
 import SavedStartups from './components/SavedStartups';
-import StartupInteractionTimeline from './components/StartupInteractionTimeline';
-import ContactManagement from './components/ContactManagement';
-import MessageComposer from './components/MessageComposer';
 import PublicChallenge from './components/PublicChallenge';
 import AdminInterface from './components/admin/AdminInterface';
 import JediSuccess from './pages/plans/success/jedi';
@@ -94,18 +91,6 @@ function App() {
         <Route path="/plans" element={<Plans />} />
         <Route path="/startups" element={user?.emailVerified ? <StartupList /> : <Navigate to="/verify-email" replace />} />
         <Route path="/saved-startups" element={user?.emailVerified ? <SavedStartups /> : <Navigate to="/verify-email" replace />} />
-        <Route 
-          path="/startup/:startupId/timeline" 
-          element={
-            user?.emailVerified ? (
-              <StartupInteractionTimeline onBack={() => window.history.back()} />
-            ) : (
-              <Navigate to="/verify-email" replace />
-            )
-          } 
-        />
-        <Route path="/startup/:startupId/contacts" element={user?.emailVerified ? <ContactManagement /> : <Navigate to="/verify-email" replace />} />
-        <Route path="/startup/:startupId/message" element={user?.emailVerified ? <MessageComposer /> : <Navigate to="/verify-email" replace />} />
         <Route path="/account-deleted" element={<AccountDeleted />} />
         <Route path="/plans/success/jedi" element={<JediSuccess />} />
         <Route path="/plans/success/mestrejedi" element={<MestreJediSuccess />} />
