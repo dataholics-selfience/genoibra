@@ -454,7 +454,7 @@ const ChatInterface = ({ messages, addMessage, toggleSidebar, isSidebarOpen, cur
             <Menu size={24} />
           </button>
           <div className="flex items-center gap-2 flex-1 ml-4">
-            <FolderOpen size={20} className="text-gray-400" />
+            {currentChallenge && <FolderOpen size={20} className="text-gray-400" />}
             {isEditing ? (
               <form onSubmit={handleEditSubmit} className="flex-1 space-y-2">
                 <input
@@ -491,28 +491,34 @@ const ChatInterface = ({ messages, addMessage, toggleSidebar, isSidebarOpen, cur
               <div className="flex items-center justify-between flex-1">
                 <div className="flex items-center gap-4">
                   <h2 className="text-lg font-medium">{currentChallenge?.title}</h2>
-                  <button
-                    onClick={() => {
-                      setEditData({
-                        title: currentChallenge?.title || '',
-                        description: currentChallenge?.description || ''
-                      });
-                      setIsEditing(true);
-                    }}
-                    className="p-1 text-gray-400 hover:text-white rounded-full hover:bg-gray-800 transition-colors"
-                  >
-                    <Pencil size={16} />
-                  </button>
+                  {currentChallenge && (
+                    <button
+                      onClick={() => {
+                        setEditData({
+                          title: currentChallenge?.title || '',
+                          description: currentChallenge?.description || ''
+                        });
+                        setIsEditing(true);
+                      }}
+                      className="p-1 text-gray-400 hover:text-white rounded-full hover:bg-gray-800 transition-colors"
+                    >
+                      <Pencil size={16} />
+                    </button>
+                  )}
                 </div>
                 <div className="flex items-center gap-4">
-                  <StartupListIcons challengeId={currentChallenge?.id} />
-                  <Link
-                    to="/saved-startups"
-                    className="flex items-center gap-2 px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors text-sm"
-                  >
-                    <BarChart3 size={16} />
-                    Pipeline CRM
-                  </Link>
+                  {currentChallenge && (
+                    <>
+                      <StartupListIcons challengeId={currentChallenge?.id} />
+                      <Link
+                        to="/saved-startups"
+                        className="flex items-center gap-2 px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors text-sm"
+                      >
+                        <BarChart3 size={16} />
+                        Pipeline CRM
+                      </Link>
+                    </>
+                  )}
                 </div>
               </div>
             )}

@@ -1,11 +1,55 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { createUserWithEmailAndPassword, sendEmailVerification } from 'firebase/auth';
-import { doc, setDoc, collection, query, where, getDocs } from 'firebase/firestore';
+import { doc, setDoc, collection, query, where, getDocs, updateDoc } from 'firebase/firestore';
 import { auth, db } from '../../firebase';
 import { v4 as uuidv4 } from 'uuid';
 import { useTranslation } from '../../utils/i18n';
+import { MessageSquare } from 'lucide-react';
 
+// Modal de acesso restrito
+const RestrictedAccessModal = ({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) => {
+  if (!isOpen) return null;
+
+  const handleWhatsAppContact = () => {
+    const message = encodeURIComponent('Olá! Gostaria de solicitar acesso à plataforma Gen.OI. Poderia me ajudar?');
+    const whatsappUrl = `https://wa.me/5511995736666?text=${message}`;
+    window.open(whatsappUrl, '_blank');
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
+      <div className="bg-gray-800 rounded-lg p-6 max-w-md mx-4 border border-gray-700">
+        <div className="text-center">
+          <div className="w-16 h-16 bg-red-900 rounded-full flex items-center justify-center mx-auto mb-4">
+            <MessageSquare size={32} className="text-red-400" />
+          </div>
+          <h3 className="text-xl font-bold text-white mb-4">Acesso Restrito</h3>
+          <p className="text-gray-300 mb-6">
+            Esta plataforma possui acesso restrito. Apenas usuários autorizados podem criar contas.
+          </p>
+          <p className="text-gray-400 text-sm mb-6">
+            Entre em contato conosco para solicitar acesso à plataforma.
+          </p>
+          <div className="flex gap-4">
+            <button
+              onClick={handleWhatsAppContact}
+              className="flex-1 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors font-medium"
+            >
+              Contatar via WhatsApp
+            </button>
+            <button
+              onClick={onClose}
+              className="flex-1 py-3 bg-gray-600 hover:bg-gray-700 text-white rounded-lg transition-colors"
+            >
+              Fechar
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
 const Register = () => {
   const { t } = useTranslation();
   const [formData, setFormData] = useState({
@@ -19,6 +63,7 @@ const Register = () => {
   });
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [showRestrictedModal, setShowRestrictedModal] = useState(false);
   const navigate = useNavigate();
 
   const checkDeletedUser = async (email: string) => {
@@ -31,6 +76,16 @@ const Register = () => {
     return !querySnapshot.empty;
   };
 
+  const checkAuthorizedEmail = async (email: string) => {
+    const q = query(
+      collection(db, 'authorizedEmails'),
+      where('email', '==', email.toLowerCase().trim()),
+      where('status', '==', 'active')
+    );
+    
+    const querySnapshot = await getDocs(q);
+    return !querySnapshot.empty ? querySnapshot.docs[0] : null;
+  };
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.terms) {
@@ -49,6 +104,13 @@ const Register = () => {
         return;
       }
 
+      // Check if email is authorized
+      const authorizedDoc = await checkAuthorizedEmail(formData.email);
+      if (!authorizedDoc) {
+        setShowRestrictedModal(true);
+        setIsLoading(false);
+        return;
+      }
       const userCredential = await createUserWithEmailAndPassword(
         auth, 
         formData.email.trim(), 
@@ -102,6 +164,12 @@ const Register = () => {
         transactionId: crypto.randomUUID()
       });
 
+      // Mark email as used
+      await updateDoc(doc(db, 'authorizedEmails', authorizedDoc.id), {
+        status: 'used',
+        usedAt: new Date().toISOString(),
+        usedBy: user.uid
+      });
       await sendEmailVerification(user);
 
       navigate('/verify-email');
@@ -131,6 +199,10 @@ const Register = () => {
 
   return (
     <div className="min-h-screen bg-black flex items-center justify-center p-4">
+      <RestrictedAccessModal 
+        isOpen={showRestrictedModal} 
+        onClose={() => setShowRestrictedModal(false)} 
+      />
       <div className="max-w-md w-full space-y-8">
         <div className="text-center">
           <img src="https://genoi.net/wp-content/uploads/2024/12/Logo-gen.OI-Novo-1-2048x1035.png" alt="Genie Logo" className="mx-auto h-24" />

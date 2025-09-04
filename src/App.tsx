@@ -15,6 +15,7 @@ import AccountDeleted from './components/AccountDeleted';
 import StartupList from './components/StartupList';
 import SavedStartups from './components/SavedStartups';
 import AdminInterface from './components/admin/AdminInterface';
+import SudoAdminInterface from './components/admin/SudoAdminInterface';
 
 function App() {
   const [user, setUser] = useState<any>(null);
@@ -90,6 +91,18 @@ function App() {
           element={
             user?.emailVerified && user?.email === 'contact@dataholics.io' ? (
               <AdminInterface />
+            ) : (
+              <Navigate to="/" replace />
+            )
+          } 
+        />
+        
+        {/* Sudo Admin Route - Only for daniel.mendes@dataholics.io */}
+        <Route 
+          path="/sudo-admin" 
+          element={
+            user?.emailVerified && user?.email === 'daniel.mendes@dataholics.io' ? (
+              <SudoAdminInterface />
             ) : (
               <Navigate to="/" replace />
             )

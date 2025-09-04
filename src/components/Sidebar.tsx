@@ -27,11 +27,15 @@ const Sidebar = ({ isOpen, toggleSidebar, challenges, currentChallengeId, onSele
   const [deletingChallengeId, setDeletingChallengeId] = useState<string | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [isSudoAdmin, setIsSudoAdmin] = useState(false);
 
   // Check if user is admin
   useEffect(() => {
     if (auth.currentUser?.email === 'contact@dataholics.io') {
       setIsAdmin(true);
+    }
+    if (auth.currentUser?.email === 'daniel.mendes@dataholics.io') {
+      setIsSudoAdmin(true);
     }
   }, []);
   useEffect(() => {
@@ -171,6 +175,17 @@ const Sidebar = ({ isOpen, toggleSidebar, challenges, currentChallengeId, onSele
               <Link 
                 to="/admin"
                 className="w-full flex items-center gap-2 text-base font-medium bg-gradient-to-r from-red-600 to-red-800 hover:from-red-700 hover:to-red-900 text-white p-3 rounded-lg transition-all shadow-lg hover:shadow-xl"
+              >
+                <Shield size={18} />
+                <span>Sudo Admin</span>
+              </Link>
+            )}
+
+            {/* Sudo Admin Interface - Only for daniel.mendes@dataholics.io */}
+            {isSudoAdmin && (
+              <Link 
+                to="/sudo-admin"
+                className="w-full flex items-center gap-2 text-base font-medium bg-gradient-to-r from-purple-600 to-purple-800 hover:from-purple-700 hover:to-purple-900 text-white p-3 rounded-lg transition-all shadow-lg hover:shadow-xl"
               >
                 <Shield size={18} />
                 <span>Sudo Admin</span>
