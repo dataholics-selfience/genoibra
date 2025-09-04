@@ -1,12 +1,20 @@
 # Gen.OI - Plataforma de Inovação Aberta
 
+## 🔥 Configuração do Firebase
+
+O projeto está configurado para usar o Firebase project: **genoibra-5ed82**
+
+- Project ID: `genoibra-5ed82`
+- Auth Domain: `genoibra-5ed82.firebaseapp.com`
+- Storage Bucket: `genoibra-5ed82.firebasestorage.app`
+
 ## 🔧 Configuração do MailerSend
 
 ### 1. Instalar a extensão oficial do MailerSend
 
 #### Via Console Firebase:
-1. Acesse o [Firebase Console](https://console.firebase.google.com/)
-2. Selecione seu projeto `genoi-7777`
+1. Acesse o [Firebase Console](https://console.firebase.google.com/project/genoibra-5ed82)
+2. Selecione seu projeto `genoibra-5ed82`
 3. Vá em **Extensions** no menu lateral
 4. Clique em **Browse Hub**
 5. Procure por "MailerSend" ou acesse diretamente: [MailerSend Extension](https://extensions.dev/extensions/mailersend/mailersend-email)
@@ -14,7 +22,7 @@
 
 #### Via Firebase CLI:
 ```bash
-firebase ext:install mailersend/mailersend-email --project=genoi-7777
+firebase ext:install mailersend/mailersend-email --project=genoibra-5ed82
 ```
 
 ### 2. Configuração durante a instalação
@@ -85,7 +93,7 @@ npm run dev
 ### Produção
 ```bash
 npm run build
-firebase deploy
+firebase deploy --project=genoibra-5ed82
 ```
 
 ## 📊 Monitoramento
