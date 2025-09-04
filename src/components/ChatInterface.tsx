@@ -318,7 +318,8 @@ const ChatInterface = ({ messages, addMessage, toggleSidebar, isSidebarOpen, cur
             await addMessage({
               role: 'assistant',
               content: `${t.viewCompleteList}\n\n<startup-list-button>${t.startupListButton}</startup-list-button>`,
-              hidden: false
+              hidden: false,
+              timestamp: new Date().toISOString()
             });
 
             // Force re-render to ensure startup cards display properly
@@ -327,7 +328,8 @@ const ChatInterface = ({ messages, addMessage, toggleSidebar, isSidebarOpen, cur
             await addMessage({ 
               role: 'assistant', 
               content: aiResponse,
-              hidden: overrideMessage ? true : false
+              hidden: overrideMessage ? true : false,
+              timestamp: new Date().toISOString()
             });
             scrollToBottom();
           }
@@ -336,7 +338,8 @@ const ChatInterface = ({ messages, addMessage, toggleSidebar, isSidebarOpen, cur
         console.error('Error in chat:', error);
         await addMessage({
           role: 'assistant',
-          content: 'Desculpe, ocorreu um erro ao processar sua mensagem. Por favor, tente novamente.'
+          content: 'Desculpe, ocorreu um erro ao processar sua mensagem. Por favor, tente novamente.',
+          timestamp: new Date().toISOString()
         });
         scrollToBottom();
       } finally {

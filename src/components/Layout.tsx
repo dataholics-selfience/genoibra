@@ -68,7 +68,8 @@ const Layout = () => {
 
     const messagesQuery = query(
       collection(db, 'messages'),
-      where('challengeId', '==', currentChallengeId)
+      where('challengeId', '==', currentChallengeId),
+      orderBy('timestamp', 'asc')
     );
 
     const unsubscribe = onSnapshot(messagesQuery, (snapshot) => {
