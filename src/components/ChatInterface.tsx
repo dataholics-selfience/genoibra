@@ -26,6 +26,43 @@ declare global {
   }
 }
 
+// Modal de contato com administrador
+const ContactAdminModal = ({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) => {
+  const { t } = useTranslation();
+  
+  if (!isOpen) return null;
+
+  const handleWhatsAppContact = () => {
+    const message = encodeURIComponent('Olá! Preciso de mais tokens para continuar usando a plataforma Gen.OI. Poderia me ajudar?');
+    const whatsappUrl = `https://wa.me/5511995736666?text=${message}`;
+    window.open(whatsappUrl, '_blank');
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-gray-800 rounded-lg p-6 max-w-md mx-4">
+        <h3 className="text-lg font-bold text-white mb-4">Tokens Esgotados</h3>
+        <p className="text-gray-300 mb-6">
+          Você não possui tokens suficientes para continuar. Entre em contato com o administrador para solicitar mais tokens.
+        </p>
+        <div className="flex gap-4">
+          <button
+            onClick={handleWhatsAppContact}
+            className="flex-1 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors"
+          >
+            Contatar via WhatsApp
+          </button>
+          <button
+            onClick={onClose}
+            className="flex-1 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg transition-colors"
+          >
+            Fechar
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
 const ChatInterface = ({ messages, addMessage, toggleSidebar, isSidebarOpen, currentChallenge }: ChatInterfaceProps) => {
   const { t } = useTranslation();
   const [input, setInput] = useState('');
@@ -41,6 +78,7 @@ const ChatInterface = ({ messages, addMessage, toggleSidebar, isSidebarOpen, cur
   const [isRecording, setIsRecording] = useState(false);
   const [recognition, setRecognition] = useState<any>(null);
   const [forceRender, setForceRender] = useState(0);
+  const [showContactModal, setShowContactModal] = useState(false);
   
   const responseTimer = useRef<NodeJS.Timeout>();
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -164,10 +202,7 @@ const ChatInterface = ({ messages, addMessage, toggleSidebar, isSidebarOpen, cur
 
     const remainingTokens = tokenUsage.totalTokens - tokenUsage.usedTokens;
     if (remainingTokens < cost) {
-      await addMessage({
-        role: 'assistant',
-        content: `${t.tokenLimitReached} ${tokenUsage.plan}. ${t.updatePlan}\n\n<upgrade-plan-button>${t.upgradeButton}</upgrade-plan-button>`
-      });
+      setShowContactModal(true);
       return false;
     }
 
@@ -399,19 +434,6 @@ const ChatInterface = ({ messages, addMessage, toggleSidebar, isSidebarOpen, cur
       );
     }
 
-    if (message.content.includes('<upgrade-plan-button>') || message.content.includes('upgrade-plan-button')) {
-      return (
-        <div className="space-y-4" key={`${message.id}-${forceRender}`}>
-          <p className="text-lg font-semibold">{message.content.split('<upgrade-plan-button>')[0].split('upgrade-plan-button')[0]}</p>
-          <Link
-            to="/plans"
-            className="inline-block bg-gradient-to-r from-blue-600 to-purple-600 text-white px-6 py-3 rounded-lg font-bold hover:from-blue-700 hover:to-purple-700 transition-all shadow-lg hover:shadow-xl"
-          >
-            {t.upgradeButton}
-          </Link>
-        </div>
-      );
-    }
 
     return <p className="whitespace-pre-wrap text-lg font-semibold" key={`${message.id}-${forceRender}`}>{message.content}</p>;
   };
@@ -420,6 +442,8 @@ const ChatInterface = ({ messages, addMessage, toggleSidebar, isSidebarOpen, cur
 
   return (
     <div className="flex flex-col h-screen bg-black overflow-hidden w-full">
+      <ContactAdminModal isOpen={showContactModal} onClose={() => setShowContactModal(false)} />
+      
       {/* Header - Fixed at top */}
       <div className="flex flex-col p-3 border-b border-border flex-shrink-0 w-full bg-black">
         <div className="flex items-center justify-between w-full">

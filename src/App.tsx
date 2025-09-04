@@ -10,16 +10,11 @@ import Register from './components/auth/Register';
 import ForgotPassword from './components/auth/ForgotPassword';
 import UserManagement from './components/UserProfile/UserManagement';
 import NewChallenge from './components/NewChallenge';
-import Plans from './components/Plans';
 import EmailVerification from './components/auth/EmailVerification';
 import AccountDeleted from './components/AccountDeleted';
 import StartupList from './components/StartupList';
 import SavedStartups from './components/SavedStartups';
-import PublicChallenge from './components/PublicChallenge';
 import AdminInterface from './components/admin/AdminInterface';
-import JediSuccess from './pages/plans/success/jedi';
-import MestreJediSuccess from './pages/plans/success/mestrejedi';
-import MestreYodaSuccess from './pages/plans/success/mestreyoda';
 
 function App() {
   const [user, setUser] = useState<any>(null);
@@ -76,9 +71,6 @@ function App() {
   return (
     <Router>
       <Routes>
-        {/* Public Challenge Route - No authentication required */}
-        <Route path="/desafio/:slug" element={<PublicChallenge />} />
-        
         {/* Authentication Routes */}
         <Route path="/login" element={!user ? <Login /> : <Navigate to="/" replace />} />
         <Route path="/register" element={!user ? <Register /> : <Navigate to="/" replace />} />
@@ -88,13 +80,9 @@ function App() {
         {/* Protected Routes */}
         <Route path="/profile" element={user?.emailVerified ? <UserManagement /> : <Navigate to="/verify-email" replace />} />
         <Route path="/new-challenge" element={user?.emailVerified ? <NewChallenge /> : <Navigate to="/verify-email" replace />} />
-        <Route path="/plans" element={<Plans />} />
         <Route path="/startups" element={user?.emailVerified ? <StartupList /> : <Navigate to="/verify-email" replace />} />
         <Route path="/saved-startups" element={user?.emailVerified ? <SavedStartups /> : <Navigate to="/verify-email" replace />} />
         <Route path="/account-deleted" element={<AccountDeleted />} />
-        <Route path="/plans/success/jedi" element={<JediSuccess />} />
-        <Route path="/plans/success/mestrejedi" element={<MestreJediSuccess />} />
-        <Route path="/plans/success/mestreyoda" element={<MestreYodaSuccess />} />
         
         {/* Admin Route - Only for contact@dataholics.io */}
         <Route 

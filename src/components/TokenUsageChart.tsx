@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
 import { doc, getDoc } from 'firebase/firestore';
 import { auth, db } from '../firebase';
 import { format, addDays } from 'date-fns';
@@ -83,13 +82,6 @@ const TokenUsageChart = ({ totalTokens, usedTokens }: TokenUsageChartProps) => {
           {t.renewalOn || 'Renovação em'} {formattedRenewalDate}
         </div>
       )}
-
-      <Link 
-        to="/plans" 
-        className="mt-3 block text-center text-sm text-blue-400 hover:text-blue-300 transition-colors"
-      >
-        {t.upgradePlan || 'Atualizar plano'}
-      </Link>
     </div>
   );
 };
