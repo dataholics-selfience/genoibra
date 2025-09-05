@@ -16,6 +16,7 @@ import StartupList from './components/StartupList';
 import SavedStartups from './components/SavedStartups';
 import AdminInterface from './components/admin/AdminInterface';
 import SudoAdminInterface from './components/admin/SudoAdminInterface';
+import TokenRegister from './components/auth/TokenRegister';
 
 function App() {
   const [user, setUser] = useState<any>(null);
@@ -75,6 +76,7 @@ function App() {
         {/* Authentication Routes */}
         <Route path="/login" element={!user ? <Login /> : <Navigate to="/" replace />} />
         <Route path="/register" element={!user ? <Register /> : <Navigate to="/" replace />} />
+        <Route path="/register/:token" element={!user ? <TokenRegister /> : <Navigate to="/" replace />} />
         <Route path="/forgot-password" element={!user ? <ForgotPassword /> : <Navigate to="/" replace />} />
         <Route path="/verify-email" element={<EmailVerification />} />
         

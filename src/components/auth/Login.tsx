@@ -171,13 +171,6 @@ const Login = () => {
             >
               {t.forgotPassword}
             </Link>
-            <Link 
-              to="/register" 
-              className="text-lg text-blue-400 hover:text-blue-500 font-medium uppercase"
-              tabIndex={isLoading ? -1 : 0}
-            >
-              {t.createAccount}
-            </Link>
           </div>
         </form>
       </div>
