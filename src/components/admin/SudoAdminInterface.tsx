@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
-  ArrowLeft, Plus, Trash2, Mail, Shield, 
-  CheckCircle, AlertTriangle, Users, Database, QrCode, Copy, Clock
+  ArrowLeft, Plus, Trash2, Shield, 
+  CheckCircle, AlertTriangle, QrCode, Copy, Clock, Mail, Users
 } from 'lucide-react';
 import { 
   collection, 
@@ -11,19 +11,10 @@ import {
   deleteDoc, 
   doc, 
   query, 
-  orderBy,
-  where
+  orderBy
 } from 'firebase/firestore';
 import { auth, db } from '../../firebase';
 import QRCode from 'qrcode';
-
-interface AuthorizedEmail {
-  id: string;
-  email: string;
-  addedBy: string;
-  addedAt: string;
-  status: 'active' | 'used';
-}
 
 interface RegistrationToken {
   id: string;
@@ -34,17 +25,17 @@ interface RegistrationToken {
   expiresAt: string;
   status: 'active' | 'used' | 'expired';
   qrCodeUrl?: string;
+  registrationUrl?: string;
 }
+
 const SudoAdminInterface = () => {
   const navigate = useNavigate();
-  const [authorizedEmails, setAuthorizedEmails] = useState<AuthorizedEmail[]>([]);
   const [registrationTokens, setRegistrationTokens] = useState<RegistrationToken[]>([]);
   const [newEmail, setNewEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [showQRModal, setShowQRModal] = useState<RegistrationToken | null>(null);
-  const [activeTab, setActiveTab] = useState<'emails' | 'tokens'>('emails');
 
   // Check if user is authorized sudo admin
   useEffect(() => {
@@ -54,35 +45,13 @@ const SudoAdminInterface = () => {
     }
   }, [navigate]);
 
-  // Load authorized emails
+  // Load registration tokens
   useEffect(() => {
-    loadAuthorizedEmails();
     loadRegistrationTokens();
   }, []);
 
-  const loadAuthorizedEmails = async () => {
-    setLoading(true);
-    try {
-      const q = query(
-        collection(db, 'authorizedEmails'),
-        orderBy('addedAt', 'desc')
-      );
-      const querySnapshot = await getDocs(q);
-      const emails = querySnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as AuthorizedEmail[];
-      
-      setAuthorizedEmails(emails);
-    } catch (error) {
-      console.error('Error loading authorized emails:', error);
-      setError('Erro ao carregar emails autorizados');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const loadRegistrationTokens = async () => {
+    setLoading(true);
     try {
       const q = query(
         collection(db, 'registrationTokens'),
@@ -97,6 +66,9 @@ const SudoAdminInterface = () => {
       setRegistrationTokens(tokens);
     } catch (error) {
       console.error('Error loading registration tokens:', error);
+      setError('Erro ao carregar tokens de registro');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -164,27 +136,45 @@ const SudoAdminInterface = () => {
 
     const emailToAdd = newEmail.trim().toLowerCase();
 
-    // Check if email already exists
-    const existingEmail = authorizedEmails.find(item => item.email === emailToAdd);
-    if (existingEmail) {
-      setError('Este email já está autorizado');
+    // Check if email already has an active token
+    const existingActiveToken = registrationTokens.find(
+      token => token.email === emailToAdd && 
+      token.status === 'active' && 
+      !isTokenExpired(token.expiresAt)
+    );
+    
+    if (existingActiveToken) {
+      setError('Este email já possui um token ativo. Aguarde a expiração ou remova o token existente.');
       return;
     }
 
+    // Check if email was already used
+    const usedToken = registrationTokens.find(
+      token => token.email === emailToAdd && token.status === 'used'
+    );
+    
+    if (usedToken) {
+      setError('Este email já foi utilizado para cadastro. Não é possível gerar novo token.');
+      return;
+    }
+
+    setLoading(true);
+    setError('');
+
     try {
-      // Gerar token de registro com QR code
       const registrationToken = await generateRegistrationToken(emailToAdd);
       
       setNewEmail('');
-      setError('');
       setSuccess('Token de registro gerado com sucesso! QR Code criado.');
       setShowQRModal(registrationToken);
       
       // Clear success message after 3 seconds
       setTimeout(() => setSuccess(''), 3000);
     } catch (error) {
-      console.error('Error adding authorized email:', error);
+      console.error('Error adding email and generating token:', error);
       setError('Erro ao gerar token de registro');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -203,24 +193,6 @@ const SudoAdminInterface = () => {
     } catch (error) {
       console.error('Error deleting registration token:', error);
       setError('Erro ao remover token');
-    }
-  };
-
-  const handleDeleteEmail = async (emailId: string, email: string) => {
-    const confirmed = window.confirm(
-      `Tem certeza que deseja remover a autorização do email "${email}"?`
-    );
-
-    if (!confirmed) return;
-
-    try {
-      await deleteDoc(doc(db, 'authorizedEmails', emailId));
-      setAuthorizedEmails(prev => prev.filter(item => item.id !== emailId));
-      setSuccess('Email removido da lista de autorizados');
-      setTimeout(() => setSuccess(''), 3000);
-    } catch (error) {
-      console.error('Error deleting authorized email:', error);
-      setError('Erro ao remover email');
     }
   };
 
@@ -262,6 +234,10 @@ const SudoAdminInterface = () => {
     return `${hours}h ${minutes}m restantes`;
   };
 
+  const activeTokens = registrationTokens.filter(t => t.status === 'active' && !isTokenExpired(t.expiresAt));
+  const usedTokens = registrationTokens.filter(t => t.status === 'used');
+  const expiredTokens = registrationTokens.filter(t => isTokenExpired(t.expiresAt) || t.status === 'expired');
+
   return (
     <div className="min-h-screen bg-black">
       {/* Header */}
@@ -277,7 +253,7 @@ const SudoAdminInterface = () => {
             <div className="flex items-center gap-3">
               <Shield size={24} className="text-purple-500" />
               <h1 className="text-2xl font-bold text-white">Sudo Admin</h1>
-              <span className="text-sm text-gray-400">- Gerenciamento de Acesso</span>
+              <span className="text-sm text-gray-400">- Gerenciamento de Acesso com QR Code</span>
             </div>
           </div>
           
@@ -288,77 +264,14 @@ const SudoAdminInterface = () => {
       </div>
 
       <div className="max-w-4xl mx-auto p-6">
-        {/* Tab Navigation */}
-        <div className="flex gap-4 mb-8">
-          <button
-            onClick={() => setActiveTab('emails')}
-            className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-              activeTab === 'emails'
-                ? 'bg-purple-600 text-white'
-                : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-            }`}
-          >
-            <Mail size={16} className="inline mr-2" />
-            Emails Autorizados
-          </button>
-          <button
-            onClick={() => setActiveTab('tokens')}
-            className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-              activeTab === 'tokens'
-                ? 'bg-purple-600 text-white'
-                : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-            }`}
-          >
-            <QrCode size={16} className="inline mr-2" />
-            Tokens de Registro
-          </button>
-        </div>
-
         {/* Add Email Form */}
-        {activeTab === 'tokens' && (
-          <div className="bg-gray-800 rounded-lg p-6 mb-8">
-            <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
-              <QrCode size={20} />
-              Gerar Token de Registro com QR Code
-            </h2>
-            <p className="text-gray-300 text-sm mb-4">
-              Crie um token único com QR code que expira em 12 horas. O usuário precisará confirmar o email antes de acessar o cadastro.
-            </p>
-            
-            <form onSubmit={handleAddEmail} className="flex gap-4">
-              <div className="flex-1">
-                <input
-                  type="email"
-                  value={newEmail}
-                  onChange={(e) => setNewEmail(e.target.value)}
-                  placeholder="Digite o email para gerar token de registro..."
-                  className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
-                  disabled={loading}
-                />
-              </div>
-              <button
-                type="submit"
-                disabled={loading || !newEmail.trim()}
-                className={`px-6 py-3 rounded-lg font-medium transition-colors ${
-                  loading || !newEmail.trim()
-                    ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
-                    : 'bg-purple-600 hover:bg-purple-700 text-white'
-                }`}
-              >
-                <QrCode size={20} />
-              </button>
-            </form>
-          </div>
-        )}
-
-        {activeTab === 'emails' && (
-          <div className="bg-gray-800 rounded-lg p-6 mb-8">
+        <div className="bg-gray-800 rounded-lg p-6 mb-8">
           <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
-            <Plus size={20} />
-            Autorizar Novo Email
+            <QrCode size={20} />
+            Gerar Acesso Temporário com QR Code
           </h2>
           <p className="text-gray-300 text-sm mb-4">
-            Método tradicional: adiciona email diretamente à lista de autorizados.
+            Crie um token único com QR code que expira em 12 horas. O usuário só poderá se cadastrar com o email específico autorizado.
           </p>
           
           <form onSubmit={handleAddEmail} className="flex gap-4">
@@ -367,7 +280,7 @@ const SudoAdminInterface = () => {
                 type="email"
                 value={newEmail}
                 onChange={(e) => setNewEmail(e.target.value)}
-                placeholder="Digite o email para autorizar..."
+                placeholder="Digite o email para gerar token de registro..."
                 className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
                 disabled={loading}
               />
@@ -375,17 +288,26 @@ const SudoAdminInterface = () => {
             <button
               type="submit"
               disabled={loading || !newEmail.trim()}
-              className={`px-6 py-3 rounded-lg font-medium transition-colors ${
+              className={`px-6 py-3 rounded-lg font-medium transition-colors flex items-center gap-2 ${
                 loading || !newEmail.trim()
                   ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
                   : 'bg-purple-600 hover:bg-purple-700 text-white'
               }`}
             >
-              <Plus size={20} />
+              {loading ? (
+                <>
+                  <div className="w-5 h-5 border-2 border-gray-300 border-t-transparent rounded-full animate-spin" />
+                  Gerando...
+                </>
+              ) : (
+                <>
+                  <QrCode size={20} />
+                  Gerar QR Code
+                </>
+              )}
             </button>
           </form>
         </div>
-        )}
 
         {/* Status Messages */}
         {error && (
@@ -405,55 +327,31 @@ const SudoAdminInterface = () => {
         {/* Stats */}
         <div className="bg-gray-800 rounded-lg p-4 mb-6">
           <div className="flex items-center gap-6">
-            {activeTab === 'emails' ? (
-              <>
-                <div className="flex items-center gap-2">
-                  <Users size={16} className="text-blue-400" />
-                  <span className="text-gray-300">Total Autorizados: {authorizedEmails.length}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <CheckCircle size={16} className="text-green-400" />
-                  <span className="text-gray-300">
-                    Ativos: {authorizedEmails.filter(e => e.status === 'active').length}
-                  </span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Database size={16} className="text-purple-400" />
-                  <span className="text-gray-300">
-                    Utilizados: {authorizedEmails.filter(e => e.status === 'used').length}
-                  </span>
-                </div>
-              </>
-            ) : (
-              <>
-                <div className="flex items-center gap-2">
-                  <QrCode size={16} className="text-blue-400" />
-                  <span className="text-gray-300">Total Tokens: {registrationTokens.length}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <CheckCircle size={16} className="text-green-400" />
-                  <span className="text-gray-300">
-                    Ativos: {registrationTokens.filter(t => t.status === 'active' && !isTokenExpired(t.expiresAt)).length}
-                  </span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Clock size={16} className="text-red-400" />
-                  <span className="text-gray-300">
-                    Expirados: {registrationTokens.filter(t => isTokenExpired(t.expiresAt)).length}
-                  </span>
-                </div>
-              </>
-            )}
+            <div className="flex items-center gap-2">
+              <QrCode size={16} className="text-blue-400" />
+              <span className="text-gray-300">Total: {registrationTokens.length}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <CheckCircle size={16} className="text-green-400" />
+              <span className="text-gray-300">Ativos: {activeTokens.length}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Users size={16} className="text-blue-400" />
+              <span className="text-gray-300">Utilizados: {usedTokens.length}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Clock size={16} className="text-red-400" />
+              <span className="text-gray-300">Expirados: {expiredTokens.length}</span>
+            </div>
           </div>
         </div>
 
-        {/* Content based on active tab */}
-        {activeTab === 'emails' && (
-          <div className="bg-gray-800 rounded-lg overflow-hidden">
+        {/* Registration Tokens List */}
+        <div className="bg-gray-800 rounded-lg overflow-hidden">
           <div className="bg-gray-900 px-6 py-4 border-b border-gray-700">
             <h3 className="text-lg font-bold text-white flex items-center gap-2">
-              <Mail size={20} />
-              Emails Autorizados
+              <QrCode size={20} />
+              Tokens de Registro Temporário
             </h3>
           </div>
 
@@ -461,154 +359,88 @@ const SudoAdminInterface = () => {
             <div className="flex items-center justify-center py-12">
               <div className="text-white">Carregando...</div>
             </div>
-          ) : authorizedEmails.length === 0 ? (
+          ) : registrationTokens.length === 0 ? (
             <div className="text-center py-12">
-              <Mail size={64} className="text-gray-600 mx-auto mb-4" />
-              <h4 className="text-xl font-bold text-white mb-2">Nenhum email autorizado</h4>
+              <QrCode size={64} className="text-gray-600 mx-auto mb-4" />
+              <h4 className="text-xl font-bold text-white mb-2">Nenhum token gerado</h4>
               <p className="text-gray-400">
-                Adicione emails para permitir que usuários criem contas na plataforma.
+                Gere tokens de registro com QR code para permitir cadastros temporários.
               </p>
             </div>
           ) : (
             <div className="divide-y divide-gray-700">
-              {authorizedEmails.map((item) => (
-                <div key={item.id} className="px-6 py-4 hover:bg-gray-700 transition-colors">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-4">
-                      <Mail size={20} className="text-blue-400" />
-                      <div>
-                        <div className="text-white font-medium">{item.email}</div>
-                        <div className="text-sm text-gray-400">
-                          Adicionado em {formatDate(item.addedAt)}
+              {registrationTokens.map((token) => {
+                const status = getTokenStatus(token);
+                return (
+                  <div key={token.id} className="px-6 py-4 hover:bg-gray-700 transition-colors">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-4">
+                        <QrCode size={20} className="text-purple-400" />
+                        <div>
+                          <div className="text-white font-medium">{token.email}</div>
+                          <div className="text-sm text-gray-400">
+                            Criado em {formatDate(token.createdAt)}
+                          </div>
+                          <div className="text-sm text-gray-400">
+                            {status.text === 'Ativo' ? formatTimeRemaining(token.expiresAt) : `Expira em ${formatDate(token.expiresAt)}`}
+                          </div>
+                          <div className="text-xs text-gray-500 font-mono">
+                            Token: {token.token.substring(0, 8)}...
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <div className="flex items-center gap-4">
+                        <span className={`px-3 py-1 rounded-full text-xs font-medium border ${status.color}`}>
+                          {status.text}
+                        </span>
+                        
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => setShowQRModal(token)}
+                            className="text-gray-400 hover:text-purple-400 p-2 rounded-lg hover:bg-gray-600 transition-colors"
+                            title="Ver QR Code"
+                          >
+                            <QrCode size={16} />
+                          </button>
+                          <button
+                            onClick={() => copyToClipboard(token.registrationUrl || '')}
+                            className="text-gray-400 hover:text-blue-400 p-2 rounded-lg hover:bg-gray-600 transition-colors"
+                            title="Copiar URL"
+                          >
+                            <Copy size={16} />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteToken(token.id, token.email)}
+                            className="text-gray-400 hover:text-red-400 p-2 rounded-lg hover:bg-gray-600 transition-colors"
+                            title="Remover Token"
+                          >
+                            <Trash2 size={16} />
+                          </button>
                         </div>
                       </div>
                     </div>
-                    
-                    <div className="flex items-center gap-4">
-                      <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                        item.status === 'active' 
-                          ? 'bg-green-900 text-green-200 border border-green-700'
-                          : 'bg-blue-900 text-blue-200 border border-blue-700'
-                      }`}>
-                        {item.status === 'active' ? 'Ativo' : 'Utilizado'}
-                      </span>
-                      
-                      <button
-                        onClick={() => handleDeleteEmail(item.id, item.email)}
-                        className="text-gray-400 hover:text-red-400 p-2 rounded-lg hover:bg-gray-600 transition-colors"
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
-        )}
-
-        {/* Registration Tokens List */}
-        {activeTab === 'tokens' && (
-          <div className="bg-gray-800 rounded-lg overflow-hidden">
-            <div className="bg-gray-900 px-6 py-4 border-b border-gray-700">
-              <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                <QrCode size={20} />
-                Tokens de Registro
-              </h3>
-            </div>
-
-            {loading ? (
-              <div className="flex items-center justify-center py-12">
-                <div className="text-white">Carregando...</div>
-              </div>
-            ) : registrationTokens.length === 0 ? (
-              <div className="text-center py-12">
-                <QrCode size={64} className="text-gray-600 mx-auto mb-4" />
-                <h4 className="text-xl font-bold text-white mb-2">Nenhum token gerado</h4>
-                <p className="text-gray-400">
-                  Gere tokens de registro com QR code para permitir cadastros temporários.
-                </p>
-              </div>
-            ) : (
-              <div className="divide-y divide-gray-700">
-                {registrationTokens.map((token) => {
-                  const status = getTokenStatus(token);
-                  return (
-                    <div key={token.id} className="px-6 py-4 hover:bg-gray-700 transition-colors">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-4">
-                          <QrCode size={20} className="text-purple-400" />
-                          <div>
-                            <div className="text-white font-medium">{token.email}</div>
-                            <div className="text-sm text-gray-400">
-                              Criado em {formatDate(token.createdAt)}
-                            </div>
-                            <div className="text-sm text-gray-400">
-                              {status.text === 'Ativo' ? formatTimeRemaining(token.expiresAt) : `Expira em ${formatDate(token.expiresAt)}`}
-                            </div>
-                          </div>
-                        </div>
-                        
-                        <div className="flex items-center gap-4">
-                          <span className={`px-3 py-1 rounded-full text-xs font-medium border ${status.color}`}>
-                            {status.text}
-                          </span>
-                          
-                          <div className="flex gap-2">
-                            <button
-                              onClick={() => setShowQRModal(token)}
-                              className="text-gray-400 hover:text-purple-400 p-2 rounded-lg hover:bg-gray-600 transition-colors"
-                              title="Ver QR Code"
-                            >
-                              <QrCode size={16} />
-                            </button>
-                            <button
-                              onClick={() => copyToClipboard(token.registrationUrl || '')}
-                              className="text-gray-400 hover:text-blue-400 p-2 rounded-lg hover:bg-gray-600 transition-colors"
-                              title="Copiar URL"
-                            >
-                              <Copy size={16} />
-                            </button>
-                            <button
-                              onClick={() => handleDeleteToken(token.id, token.email)}
-                              className="text-gray-400 hover:text-red-400 p-2 rounded-lg hover:bg-gray-600 transition-colors"
-                            >
-                              <Trash2 size={16} />
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        )}
 
         {/* Info Box */}
         <div className="mt-8 bg-purple-900/20 border border-purple-600 rounded-lg p-6">
           <h4 className="text-purple-200 font-medium mb-2 flex items-center gap-2">
             <Shield size={16} />
-            {activeTab === 'emails' ? 'Como funciona a restrição de acesso' : 'Como funcionam os tokens de registro'}
+            Como funciona o sistema de acesso temporário
           </h4>
-          {activeTab === 'emails' ? (
-            <ul className="text-purple-100 text-sm space-y-2">
-              <li>• Apenas emails autorizados aqui podem criar contas na plataforma</li>
-              <li>• Usuários não autorizados verão uma mensagem de acesso restrito</li>
-              <li>• Quando um email autorizado criar conta, o status muda para "Utilizado"</li>
-              <li>• Você pode remover emails da lista a qualquer momento</li>
-            </ul>
-          ) : (
-            <ul className="text-purple-100 text-sm space-y-2">
-              <li>• Tokens geram URLs únicas com QR code que expiram em 12 horas</li>
-              <li>• O usuário deve confirmar o email antes de acessar o cadastro</li>
-              <li>• Cada token só pode ser usado uma vez</li>
-              <li>• Tokens expirados são automaticamente invalidados</li>
-              <li>• Ideal para convites temporários e controle de acesso</li>
-            </ul>
-          )}
+          <ul className="text-purple-100 text-sm space-y-2">
+            <li>• Cada email gera um token único com QR code válido por 12 horas</li>
+            <li>• O usuário só pode se cadastrar com o email específico do token</li>
+            <li>• Tentativas de cadastro com email diferente são bloqueadas</li>
+            <li>• Após uso ou expiração, o token fica permanentemente inválido</li>
+            <li>• Emails já utilizados não podem gerar novos tokens</li>
+            <li>• Sistema previne fraudes e garante controle total de acesso</li>
+          </ul>
         </div>
 
         {/* QR Code Modal */}
@@ -634,12 +466,13 @@ const SudoAdminInterface = () => {
                   />
                 </div>
                 
-                <div className="text-sm text-gray-300 mb-4">
-                  <p><strong>Email:</strong> {showQRModal.email}</p>
+                <div className="text-sm text-gray-300 mb-4 space-y-1">
+                  <p><strong>Email autorizado:</strong> {showQRModal.email}</p>
                   <p><strong>Status:</strong> {getTokenStatus(showQRModal).text}</p>
+                  <p><strong>Criado:</strong> {formatDate(showQRModal.createdAt)}</p>
                   <p><strong>Expira:</strong> {formatDate(showQRModal.expiresAt)}</p>
                   {getTokenStatus(showQRModal).text === 'Ativo' && (
-                    <p><strong>Tempo restante:</strong> {formatTimeRemaining(showQRModal.expiresAt)}</p>
+                    <p className="text-yellow-300"><strong>Tempo restante:</strong> {formatTimeRemaining(showQRModal.expiresAt)}</p>
                   )}
                 </div>
                 
@@ -649,7 +482,7 @@ const SudoAdminInterface = () => {
                     className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
                   >
                     <Copy size={16} />
-                    Copiar URL
+                    Copiar URL de Registro
                   </button>
                   
                   <button

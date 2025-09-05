@@ -17,6 +17,7 @@ import SavedStartups from './components/SavedStartups';
 import AdminInterface from './components/admin/AdminInterface';
 import SudoAdminInterface from './components/admin/SudoAdminInterface';
 import TokenRegister from './components/auth/TokenRegister';
+import PublicChallenge from './components/PublicChallenge';
 
 function App() {
   const [user, setUser] = useState<any>(null);
@@ -78,6 +79,7 @@ function App() {
         <Route path="/register" element={!user ? <Register /> : <Navigate to="/" replace />} />
         <Route path="/register/:token" element={!user ? <TokenRegister /> : <Navigate to="/" replace />} />
         <Route path="/forgot-password" element={!user ? <ForgotPassword /> : <Navigate to="/" replace />} />
+        <Route path="/challenge/:slug" element={<PublicChallenge />} />
         <Route path="/verify-email" element={<EmailVerification />} />
         
         {/* Protected Routes */}
