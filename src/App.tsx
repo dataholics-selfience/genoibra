@@ -17,6 +17,7 @@ import SavedStartups from './components/SavedStartups';
 import AdminInterface from './components/admin/AdminInterface';
 import SudoAdminInterface from './components/admin/SudoAdminInterface';
 import TokenRegister from './components/auth/TokenRegister';
+import SlugRegister from './components/auth/SlugRegister';
 import PublicChallenge from './components/PublicChallenge';
 
 function App() {

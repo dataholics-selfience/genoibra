@@ -82,7 +82,7 @@ const SudoAdminInterface = () => {
     const now = new Date();
     const expiresAt = new Date(now.getTime() + 12 * 60 * 60 * 1000); // 12 horas
     
-    const registrationUrl = `${window.location.origin}/register/${token}`;
+    const registrationUrl = `${window.location.origin}/invite/${slug}`;
     
     try {
       // Gerar QR Code
