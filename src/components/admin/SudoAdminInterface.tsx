@@ -78,13 +78,12 @@ const SudoAdminInterface = () => {
   };
 
   const generateRegistrationToken = async (email: string) => {
-    const token = crypto.randomUUID(); // Este será usado como slug na URL
-    const slug = token; // Usar o mesmo valor para slug
+    const token = crypto.randomUUID();
     const verificationCode = Math.random().toString(36).substring(2, 8).toUpperCase(); // Código de 6 caracteres
     const now = new Date();
     const expiresAt = new Date(now.getTime() + 12 * 60 * 60 * 1000); // 12 horas
     
-    const registrationUrl = `${window.location.origin}/invite/${slug}`;
+    const registrationUrl = `${window.location.origin}/invite/${token}`;
     
     try {
       // Gerar QR Code
@@ -99,7 +98,6 @@ const SudoAdminInterface = () => {
 
       const tokenData = {
         token,
-        slug, // Adicionar campo slug explicitamente
         verificationCode,
         email: email.toLowerCase(),
         createdBy: auth.currentUser?.email || '',
@@ -111,13 +109,6 @@ const SudoAdminInterface = () => {
         registrationUrl
       };
 
-      console.log('🔧 Gerando token de registro:', {
-        email,
-        token: token.substring(0, 8) + '...',
-        slug: slug.substring(0, 8) + '...',
-        verificationCode,
-        registrationUrl
-      });
       const docRef = await addDoc(collection(db, 'registrationTokens'), tokenData);
       
       // Enviar email com código de verificação

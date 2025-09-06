@@ -81,69 +81,26 @@ const SlugRegister = () => {
     }
 
     try {
-      console.log('🔍 Validando slug:', slug);
-      
       // Buscar token no Firestore
       const q = query(
         collection(db, 'registrationTokens'),
-        where('token', '==', slug)
+        where('slug', '==', slug)
       );
       const querySnapshot = await getDocs(q);
       
-      console.log('📊 Resultados da busca:', {
-        slug,
-        found: !querySnapshot.empty,
-        totalDocs: querySnapshot.size
-      });
-      
       if (querySnapshot.empty) {
-        // Tentar buscar por slug se não encontrou por token
-        const slugQuery = query(
-          collection(db, 'registrationTokens'),
-          where('slug', '==', slug)
-        );
-        const slugSnapshot = await getDocs(slugQuery);
-        
-        if (slugSnapshot.empty) {
-          console.error('❌ Token não encontrado nem por token nem por slug');
-          setError('Link não encontrado ou inválido');
-          setLoading(false);
-          return;
-        }
-        
-        const tokenDoc = slugSnapshot.docs[0];
-        const data = { id: tokenDoc.id, ...tokenDoc.data() } as RegistrationToken;
-        setTokenData(data);
-        console.log('✅ Token encontrado por slug:', data);
-      } else {
-        const tokenDoc = querySnapshot.docs[0];
-        const data = { id: tokenDoc.id, ...tokenDoc.data() } as RegistrationToken;
-        setTokenData(data);
-        console.log('✅ Token encontrado por token:', data);
-      }
-      
-      const tokenDoc = querySnapshot.empty ? 
-        (await getDocs(query(collection(db, 'registrationTokens'), where('slug', '==', slug)))).docs[0] :
-        querySnapshot.docs[0];
-        
-      if (!tokenDoc) {
         setError('Link não encontrado ou inválido');
         setLoading(false);
         return;
       }
       
+      const tokenDoc = querySnapshot.docs[0];
       const data = { id: tokenDoc.id, ...tokenDoc.data() } as RegistrationToken;
       setTokenData(data);
 
       // Verificar se token expirou
       const now = new Date();
       const expiresAt = new Date(data.expiresAt);
-      
-      console.log('⏰ Verificação de expiração:', {
-        now: now.toISOString(),
-        expiresAt: expiresAt.toISOString(),
-        isExpired: now > expiresAt
-      });
       
       if (now > expiresAt) {
         setError('Este link de cadastro expirou. Solicite um novo convite ao administrador.');
@@ -153,7 +110,6 @@ const SlugRegister = () => {
 
       // Verificar se token já foi usado
       if (data.status === 'used') {
-        console.log('⚠️ Token já foi usado');
         setError('Este link de cadastro já foi utilizado. Cada link só pode ser usado uma vez.');
         setLoading(false);
         return;
@@ -161,7 +117,6 @@ const SlugRegister = () => {
 
       // Verificar se código já foi verificado
       if (data.codeVerified) {
-        console.log('✅ Código já foi verificado anteriormente');
         setCodeVerified(true);
       }
 
@@ -173,7 +128,6 @@ const SlugRegister = () => {
       const existingUserSnapshot = await getDocs(existingUserQuery);
       
       if (!existingUserSnapshot.empty) {
-        console.log('⚠️ Email já possui conta');
         setError('Já existe uma conta cadastrada com este email.');
         setLoading(false);
         return;
@@ -187,14 +141,12 @@ const SlugRegister = () => {
       const deletedUserSnapshot = await getDocs(deletedUserQuery);
       
       if (!deletedUserSnapshot.empty) {
-        console.log('⚠️ Email foi deletado anteriormente');
         setError('Este email foi utilizado anteriormente e não pode ser reutilizado.');
         setLoading(false);
         return;
       }
 
       // Token válido - permitir cadastro
-      console.log('✅ Token válido, permitindo cadastro');
       setError('');
       
     } catch (error) {
@@ -363,18 +315,12 @@ const SlugRegister = () => {
       await updateDoc(doc(db, 'registrationTokens', tokenData.id), {
         status: 'used',
         usedAt: new Date().toISOString(),
-        usedBy: user.uid,
-        codeVerified: true // Garantir que está marcado como verificado
+        usedBy: user.uid
       });
 
       // Enviar email de verificação
       await sendEmailVerification(user);
 
-      console.log('✅ Usuário criado com sucesso:', {
-        uid: user.uid,
-        email: tokenData.email,
-        tokenUsed: tokenData.id
-      });
       navigate('/verify-email');
 
     } catch (error: any) {
