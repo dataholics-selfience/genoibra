@@ -1,14 +1,15 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { createUserWithEmailAndPassword, sendEmailVerification } from 'firebase/auth';
+import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { doc, setDoc, collection, query, where, getDocs, updateDoc } from 'firebase/firestore';
 import { auth, db } from '../../firebase';
 import { useTranslation } from '../../utils/i18n';
-import { ArrowLeft, CheckCircle, AlertTriangle, Clock, Shield, XCircle } from 'lucide-react';
+import { ArrowLeft, CheckCircle, AlertTriangle, Clock, Shield, XCircle, Mail } from 'lucide-react';
 
 interface RegistrationToken {
   id: string;
-  slug: string;
+  slug?: string;
+  token?: string;
   verificationCode: string;
   email: string;
   createdBy: string;
@@ -81,14 +82,27 @@ const SlugRegister = () => {
     }
 
     try {
-      // Buscar token no Firestore
-      const q = query(
+      console.log('🔍 Validando slug:', slug);
+
+      // Buscar token no Firestore usando tanto slug quanto token
+      let q = query(
         collection(db, 'registrationTokens'),
         where('slug', '==', slug)
       );
-      const querySnapshot = await getDocs(q);
+      let querySnapshot = await getDocs(q);
+      
+      // Se não encontrou por slug, tentar por token (para compatibilidade)
+      if (querySnapshot.empty) {
+        console.log('🔍 Não encontrado por slug, tentando por token...');
+        q = query(
+          collection(db, 'registrationTokens'),
+          where('token', '==', slug)
+        );
+        querySnapshot = await getDocs(q);
+      }
       
       if (querySnapshot.empty) {
+        console.log('❌ Token não encontrado no banco de dados');
         setError('Link não encontrado ou inválido');
         setLoading(false);
         return;
@@ -96,6 +110,7 @@ const SlugRegister = () => {
       
       const tokenDoc = querySnapshot.docs[0];
       const data = { id: tokenDoc.id, ...tokenDoc.data() } as RegistrationToken;
+      console.log('✅ Token encontrado:', { id: data.id, email: data.email, status: data.status });
       setTokenData(data);
 
       // Verificar se token expirou
@@ -103,6 +118,7 @@ const SlugRegister = () => {
       const expiresAt = new Date(data.expiresAt);
       
       if (now > expiresAt) {
+        console.log('⏰ Token expirado');
         setError('Este link de cadastro expirou. Solicite um novo convite ao administrador.');
         setLoading(false);
         return;
@@ -110,14 +126,10 @@ const SlugRegister = () => {
 
       // Verificar se token já foi usado
       if (data.status === 'used') {
+        console.log('🚫 Token já foi usado');
         setError('Este link de cadastro já foi utilizado. Cada link só pode ser usado uma vez.');
         setLoading(false);
         return;
-      }
-
-      // Verificar se código já foi verificado
-      if (data.codeVerified) {
-        setCodeVerified(true);
       }
 
       // Verificar se já existe uma conta com este email
@@ -128,6 +140,7 @@ const SlugRegister = () => {
       const existingUserSnapshot = await getDocs(existingUserQuery);
       
       if (!existingUserSnapshot.empty) {
+        console.log('👤 Usuário já existe');
         setError('Já existe uma conta cadastrada com este email.');
         setLoading(false);
         return;
@@ -141,12 +154,20 @@ const SlugRegister = () => {
       const deletedUserSnapshot = await getDocs(deletedUserQuery);
       
       if (!deletedUserSnapshot.empty) {
+        console.log('🗑️ Email foi deletado anteriormente');
         setError('Este email foi utilizado anteriormente e não pode ser reutilizado.');
         setLoading(false);
         return;
       }
 
+      // Verificar se código já foi verificado
+      if (data.codeVerified) {
+        console.log('✅ Código já verificado anteriormente');
+        setCodeVerified(true);
+      }
+
       // Token válido - permitir cadastro
+      console.log('✅ Token válido, permitindo cadastro');
       setError('');
       
     } catch (error) {
@@ -217,10 +238,12 @@ const SlugRegister = () => {
     setIsSubmitting(true);
 
     try {
+      console.log('🚀 Iniciando processo de cadastro...');
+
       // Verificar novamente se token ainda é válido
       const tokenQuery = query(
         collection(db, 'registrationTokens'),
-        where('slug', '==', slug)
+        where(tokenData.slug ? 'slug' : 'token', '==', slug)
       );
       const tokenSnapshot = await getDocs(tokenQuery);
       
@@ -250,6 +273,8 @@ const SlugRegister = () => {
         return;
       }
 
+      console.log('📧 Criando usuário no Firebase Auth...');
+
       // Criar usuário no Firebase Auth com o email do token
       const userCredential = await createUserWithEmailAndPassword(
         auth, 
@@ -257,6 +282,8 @@ const SlugRegister = () => {
         formData.password
       );
       const user = userCredential.user;
+
+      console.log('✅ Usuário criado no Firebase Auth:', user.uid);
 
       const transactionId = crypto.randomUUID();
       const now = new Date();
@@ -275,12 +302,15 @@ const SlugRegister = () => {
         createdAt: new Date().toISOString(),
         termsAcceptanceId: transactionId,
         registrationMethod: 'email_invite',
-        registrationSlug: slug
+        registrationSlug: slug,
+        emailVerified: true // Marcar como verificado automaticamente
       };
 
+      console.log('💾 Salvando dados do usuário no Firestore...');
       await setDoc(doc(db, 'users', user.uid), userData);
 
       // Criar registro de tokens
+      console.log('🎫 Criando registro de tokens...');
       await setDoc(doc(db, 'tokenUsage', user.uid), {
         uid: user.uid,
         email: tokenData.email.toLowerCase(),
@@ -292,6 +322,7 @@ const SlugRegister = () => {
       });
 
       // Registros de conformidade GDPR
+      console.log('📋 Criando registros GDPR...');
       await setDoc(doc(collection(db, 'gdprCompliance'), transactionId), {
         uid: user.uid,
         email: tokenData.email.toLowerCase(),
@@ -312,16 +343,25 @@ const SlugRegister = () => {
       });
 
       // Marcar token como usado
+      console.log('✅ Marcando token como usado...');
       await updateDoc(doc(db, 'registrationTokens', tokenData.id), {
         status: 'used',
         usedAt: new Date().toISOString(),
         usedBy: user.uid
       });
 
-      // Enviar email de verificação
-      await sendEmailVerification(user);
+      console.log('🎉 Cadastro concluído com sucesso! Redirecionando para login...');
 
-      navigate('/verify-email');
+      // Fazer logout para garantir que o usuário faça login novamente
+      await auth.signOut();
+
+      // Redirecionar para login com mensagem de sucesso
+      navigate('/login', { 
+        state: { 
+          message: 'Cadastro realizado com sucesso! Faça login para acessar a plataforma.',
+          email: tokenData.email
+        }
+      });
 
     } catch (error: any) {
       console.error('Registration error:', error);
@@ -602,7 +642,7 @@ const SlugRegister = () => {
                 <li>• Você deve usar o email autorizado: <strong>{tokenData?.email}</strong></li>
                 <li>• Este convite expira em {tokenData ? formatTimeRemaining(tokenData.expiresAt) : 'tempo indeterminado'}</li>
                 <li>• Cada convite só pode ser usado uma vez</li>
-                <li>• Após o cadastro, você receberá um email de verificação</li>
+                <li>• Após o cadastro, você será redirecionado para fazer login</li>
               </ul>
             </div>
           </div>
