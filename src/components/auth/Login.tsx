@@ -76,12 +76,6 @@ const Login = () => {
         throw new Error('No user data available');
       }
 
-      if (!user.emailVerified) {
-        await auth.signOut();
-        setError('Por favor, verifique seu email antes de fazer login.');
-        navigate('/verify-email');
-        return;
-      }
 
       setError('');
       navigate('/', { replace: true });

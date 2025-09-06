@@ -10,7 +10,6 @@ import Register from './components/auth/Register';
 import ForgotPassword from './components/auth/ForgotPassword';
 import UserManagement from './components/UserProfile/UserManagement';
 import NewChallenge from './components/NewChallenge';
-import EmailVerification from './components/auth/EmailVerification';
 import AccountDeleted from './components/AccountDeleted';
 import StartupList from './components/StartupList';
 import SavedStartups from './components/SavedStartups';
@@ -82,20 +81,19 @@ function App() {
         <Route path="/invite/:slug" element={!user ? <SlugRegister /> : <Navigate to="/" replace />} />
         <Route path="/forgot-password" element={!user ? <ForgotPassword /> : <Navigate to="/" replace />} />
         <Route path="/challenge/:slug" element={<PublicChallenge />} />
-        <Route path="/verify-email" element={<EmailVerification />} />
         
         {/* Protected Routes */}
-        <Route path="/profile" element={user?.emailVerified ? <UserManagement /> : <Navigate to="/verify-email" replace />} />
-        <Route path="/new-challenge" element={user?.emailVerified ? <NewChallenge /> : <Navigate to="/verify-email" replace />} />
-        <Route path="/startups" element={user?.emailVerified ? <StartupList /> : <Navigate to="/verify-email" replace />} />
-        <Route path="/saved-startups" element={user?.emailVerified ? <SavedStartups /> : <Navigate to="/verify-email" replace />} />
+        <Route path="/profile" element={user ? <UserManagement /> : <Navigate to="/login" replace />} />
+        <Route path="/new-challenge" element={user ? <NewChallenge /> : <Navigate to="/login" replace />} />
+        <Route path="/startups" element={user ? <StartupList /> : <Navigate to="/login" replace />} />
+        <Route path="/saved-startups" element={user ? <SavedStartups /> : <Navigate to="/login" replace />} />
         <Route path="/account-deleted" element={<AccountDeleted />} />
         
         {/* Admin Route - Only for contact@dataholics.io */}
         <Route 
           path="/admin" 
           element={
-            user?.emailVerified && user?.email === 'contact@dataholics.io' ? (
+            user && user?.email === 'contact@dataholics.io' ? (
               <AdminInterface />
             ) : (
               <Navigate to="/" replace />
@@ -107,7 +105,7 @@ function App() {
         <Route 
           path="/sudo-admin" 
           element={
-            user?.emailVerified && user?.email === 'daniel.mendes@dataholics.io' ? (
+            user && user?.email === 'daniel.mendes@dataholics.io' ? (
               <SudoAdminInterface />
             ) : (
               <Navigate to="/" replace />
@@ -118,11 +116,7 @@ function App() {
         {/* Default Route */}
         <Route path="/" element={
           user ? (
-            user.emailVerified ? (
-              <Layout />
-            ) : (
-              <Navigate to="/verify-email" replace />
-            )
+            <Layout />
           ) : (
             <Navigate to="/login" replace />
           )
