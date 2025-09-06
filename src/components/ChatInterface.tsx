@@ -221,13 +221,23 @@ const ChatInterface = ({ messages, addMessage, toggleSidebar, isSidebarOpen, cur
 
   const extractStartupData = (content: string) => {
     try {
-      const startMatch = content.indexOf('<startup cards>');
-      const endMatch = content.indexOf('</startup cards>');
-      
-      if (startMatch === -1 || endMatch === -1) return null;
-      
-      const jsonStr = content.substring(startMatch + 15, endMatch).trim();
-      return JSON.parse(jsonStr);
+      // Try to parse the content directly as JSON first
+      try {
+        const parsed = JSON.parse(content);
+        if (Array.isArray(parsed) && parsed.length > 0 && parsed[0].startups) {
+          return parsed[0];
+        }
+        return null;
+      } catch {
+        // If direct parsing fails, try the old format with XML tags
+        const startMatch = content.indexOf('<startup cards>');
+        const endMatch = content.indexOf('</startup cards>');
+        
+        if (startMatch === -1 || endMatch === -1) return null;
+        
+        const jsonStr = content.substring(startMatch + 15, endMatch).trim();
+        return JSON.parse(jsonStr);
+      }
     } catch (error) {
       console.error('Error parsing startup data:', error);
       return null;
