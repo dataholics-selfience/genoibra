@@ -79,6 +79,7 @@ function App() {
         <Route path="/login" element={!user ? <Login /> : <Navigate to="/" replace />} />
         <Route path="/register" element={!user ? <Register /> : <Navigate to="/" replace />} />
         <Route path="/register/:token" element={!user ? <TokenRegister /> : <Navigate to="/" replace />} />
+        <Route path="/invite/:slug" element={!user ? <SlugRegister /> : <Navigate to="/" replace />} />
         <Route path="/forgot-password" element={!user ? <ForgotPassword /> : <Navigate to="/" replace />} />
         <Route path="/challenge/:slug" element={<PublicChallenge />} />
         <Route path="/verify-email" element={<EmailVerification />} />
