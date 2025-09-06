@@ -5,6 +5,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { doc, getDoc, addDoc, collection, updateDoc } from 'firebase/firestore';
 import { auth, db } from '../firebase';
 import { useTranslation } from '../utils/i18n';
+import { API_CONFIG } from '../config/api';
 
 const STARTUP_LIST_TOKEN_COST = 30;
 
@@ -130,12 +131,9 @@ const NewChallenge = () => {
         challengeId: challengeRef.id
       });
 
-      const webhookUrl = 'https://webhook.genoiapp.com/webhook/genoibra';
-      const response = await fetch(webhookUrl, {
+      const response = await fetch(API_CONFIG.webhook.url, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: API_CONFIG.webhook.headers,
         body: JSON.stringify({
           message,
           sessionId,

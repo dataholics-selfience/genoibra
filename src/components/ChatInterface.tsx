@@ -3,6 +3,7 @@ import { Menu, SendHorizontal, Rocket, FolderOpen, Pencil, Mic, MicOff, BarChart
 import { useNavigate, Link } from 'react-router-dom';
 import { doc, getDoc, updateDoc, addDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { auth, db } from '../firebase';
+import { API_CONFIG } from '../config/api';
 import { MessageType, ChallengeType, TokenUsageType, StartupListType } from '../types';
 import { LoadingStates } from './LoadingStates';
 import { useTranslation } from '../utils/i18n';
@@ -307,10 +308,9 @@ const ChatInterface = ({ messages, addMessage, toggleSidebar, isSidebarOpen, cur
           scrollToBottom();
         }, 3000);
 
-        const webhookUrl = 'https://webhook.genoiapp.com/webhook/genoibra';
-        const response = await fetch(webhookUrl, {
+        const response = await fetch(API_CONFIG.webhook.url, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: API_CONFIG.webhook.headers,
           body: JSON.stringify({
             message: messageToSend,
             sessionId: currentChallenge.sessionId,

@@ -23,8 +23,13 @@ export default defineConfig({
   plugins: [react(), copyRedirectsPlugin()],
   server: {
     proxy: {
+      '/api': {
+        target: 'https://n8n.genoiapp.com',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api/, '')
+      },
       '/admin-api': {
-        target: 'https://webhook.genoiapp.com',
+        target: 'https://n8n.genoiapp.com',
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/admin-api/, '')
       }
