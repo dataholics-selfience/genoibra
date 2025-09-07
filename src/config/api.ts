@@ -1,6 +1,6 @@
 export const API_CONFIG = {
   webhook: {
-    url: import.meta.env.VITE_WEBHOOK_URL || 'https://webhook.genoiapp.com/webhook/production',
+    url: import.meta.env.VITE_WEBHOOK_URL || 'https://n8n.genoiapp.com/webhook/production',
     headers: {
       'Content-Type': 'application/json'
     }
