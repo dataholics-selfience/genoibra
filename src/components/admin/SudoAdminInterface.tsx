@@ -78,7 +78,8 @@ const SudoAdminInterface = () => {
   };
 
   const generateRegistrationToken = async (email: string) => {
-    const token = crypto.randomUUID();
+    const slug = crypto.randomUUID();
+    const verificationCode = Math.random().toString(36).substring(2, 8).toUpperCase(); // Código de 6 caracteres
     const now = new Date();
     const expiresAt = new Date(now.getTime() + 12 * 60 * 60 * 1000); // 12 horas
     
@@ -96,17 +97,108 @@ const SudoAdminInterface = () => {
       });
 
       const tokenData = {
-        token,
+        slug,
+        token: slug, // Manter compatibilidade
+        verificationCode,
         email: email.toLowerCase(),
         createdBy: auth.currentUser?.email || '',
         createdAt: now.toISOString(),
         expiresAt: expiresAt.toISOString(),
         status: 'active' as const,
+        codeVerified: false,
         qrCodeUrl: qrCodeDataUrl,
         registrationUrl
       };
 
       const docRef = await addDoc(collection(db, 'registrationTokens'), tokenData);
+      
+      // Enviar email com código de verificação
+      const emailHtml = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>Código de Acesso - Gen.OI</title>
+        </head>
+        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
+            <img src="https://genoi.net/wp-content/uploads/2024/12/Logo-gen.OI-Novo-1-2048x1035.png" alt="Gen.OI" style="height: 60px; margin-bottom: 20px;">
+            <h1 style="color: white; margin: 0; font-size: 24px;">Gen.OI - Código de Acesso</h1>
+          </div>
+          <div style="background: #f8f9fa; padding: 30px; border-radius: 0 0 10px 10px;">
+            <div style="background: white; padding: 25px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+              <h2 style="color: #333; margin-bottom: 20px;">Você foi convidado para a Gen.OI!</h2>
+              <p style="margin-bottom: 25px;">
+                Você recebeu um convite para criar uma conta na plataforma Gen.OI. 
+                Para prosseguir com o cadastro, você precisará do código de verificação abaixo:
+              </p>
+              
+              <div style="background: #f0f8ff; border: 2px solid #667eea; border-radius: 8px; padding: 20px; text-align: center; margin: 25px 0;">
+                <h3 style="color: #667eea; margin: 0 0 10px 0;">Seu Código de Verificação:</h3>
+                <div style="font-size: 32px; font-weight: bold; color: #333; letter-spacing: 4px; font-family: monospace;">
+                  ${verificationCode}
+                </div>
+              </div>
+              
+              <p style="margin-bottom: 20px;">
+                <strong>Como usar:</strong>
+              </p>
+              <ol style="margin-bottom: 25px; padding-left: 20px;">
+                <li>Acesse o link de cadastro: <a href="${registrationUrl}" style="color: #667eea;">${registrationUrl}</a></li>
+                <li>Digite o código de verificação: <strong>${verificationCode}</strong></li>
+                <li>Complete seu cadastro com suas informações pessoais</li>
+              </ol>
+              
+              <div style="background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 6px; padding: 15px; margin: 20px 0;">
+                <p style="margin: 0; color: #856404; font-size: 14px;">
+                  <strong>⚠️ Importante:</strong> Este código expira em 12 horas e só pode ser usado uma vez. 
+                  Mantenha-o seguro e não compartilhe com terceiros.
+                </p>
+              </div>
+              
+              <hr style="border: none; border-top: 1px solid #eee; margin: 25px 0;">
+              <div style="font-size: 14px; color: #666;">
+                <p><strong>Gen.OI</strong><br>
+                Conectando empresas às melhores startups do mundo<br>
+                🌐 <a href="https://genoi.net" style="color: #667eea;">genoi.net</a><br>
+                📧 <a href="mailto:contact@genoi.net" style="color: #667eea;">contact@genoi.net</a></p>
+              </div>
+            </div>
+          </div>
+          <div style="text-align: center; margin-top: 20px; font-size: 12px; color: #999;">
+            <p>Esta mensagem foi enviada através da plataforma Gen.OI de inovação aberta.</p>
+          </div>
+        </body>
+        </html>
+      `;
+
+      const emailPayload = {
+        to: [{ 
+          email: email.toLowerCase(), 
+          name: email.split('@')[0] 
+        }],
+        from: { 
+          email: 'contact@genoi.com.br', 
+          name: 'Gen.OI - Acesso Temporário' 
+        },
+        subject: `Código de Acesso Gen.OI: ${verificationCode}`,
+        html: emailHtml,
+        text: `Seu código de verificação Gen.OI: ${verificationCode}\n\nAcesse: ${registrationUrl}\n\nEste código expira em 12 horas.`,
+        reply_to: { 
+          email: 'contact@genoi.net', 
+          name: 'Gen.OI - Suporte' 
+        },
+        tags: ['admin', 'registration-code'],
+        metadata: { 
+          tokenId: docRef.id,
+          verificationCode,
+          registrationType: 'temporary_access'
+        }
+      };
+
+      console.log('Enviando email com código de verificação:', { email, verificationCode });
+      await addDoc(collection(db, 'emails'), emailPayload);
       
       const newToken: RegistrationToken = {
         id: docRef.id,

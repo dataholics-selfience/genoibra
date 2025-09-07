@@ -1,19 +1,22 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { createUserWithEmailAndPassword, sendEmailVerification } from 'firebase/auth';
+import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { doc, setDoc, collection, query, where, getDocs, updateDoc } from 'firebase/firestore';
 import { auth, db } from '../../firebase';
 import { useTranslation } from '../../utils/i18n';
-import { ArrowLeft, CheckCircle, AlertTriangle, Clock, Shield, XCircle } from 'lucide-react';
+import { ArrowLeft, CheckCircle, AlertTriangle, Clock, Shield, XCircle, Mail } from 'lucide-react';
 
 interface RegistrationToken {
   id: string;
-  slug: string;
+  slug?: string;
+  token?: string;
+  verificationCode: string;
   email: string;
   createdBy: string;
   createdAt: string;
   expiresAt: string;
   status: 'active' | 'used' | 'expired';
+  codeVerified: boolean;
 }
 
 const SlugRegister = () => {
@@ -23,6 +26,9 @@ const SlugRegister = () => {
   const [tokenData, setTokenData] = useState<RegistrationToken | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [verificationCode, setVerificationCode] = useState('');
+  const [codeVerified, setCodeVerified] = useState(false);
+  const [verifyingCode, setVerifyingCode] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     cpf: '',
@@ -38,6 +44,36 @@ const SlugRegister = () => {
     validateSlug();
   }, [slug]);
 
+  const handleVerifyCode = async () => {
+    if (!tokenData || !verificationCode.trim()) {
+      setError('Por favor, digite o código de verificação');
+      return;
+    }
+
+    setVerifyingCode(true);
+    setError('');
+
+    try {
+      if (verificationCode.toUpperCase() === tokenData.verificationCode) {
+        // Código correto - marcar como verificado
+        await updateDoc(doc(db, 'registrationTokens', tokenData.id), {
+          codeVerified: true,
+          codeVerifiedAt: new Date().toISOString()
+        });
+        
+        setCodeVerified(true);
+        setError('');
+      } else {
+        setError('Código de verificação incorreto. Verifique o código enviado por email.');
+      }
+    } catch (error) {
+      console.error('Error verifying code:', error);
+      setError('Erro ao verificar código. Tente novamente.');
+    } finally {
+      setVerifyingCode(false);
+    }
+  };
+
   const validateSlug = async () => {
     if (!slug) {
       setError('Link inválido ou não fornecido');
@@ -46,14 +82,27 @@ const SlugRegister = () => {
     }
 
     try {
-      // Buscar token no Firestore
-      const q = query(
+      console.log('🔍 Validando slug:', slug);
+
+      // Buscar token no Firestore usando tanto slug quanto token
+      let q = query(
         collection(db, 'registrationTokens'),
         where('slug', '==', slug)
       );
-      const querySnapshot = await getDocs(q);
+      let querySnapshot = await getDocs(q);
+      
+      // Se não encontrou por slug, tentar por token (para compatibilidade)
+      if (querySnapshot.empty) {
+        console.log('🔍 Não encontrado por slug, tentando por token...');
+        q = query(
+          collection(db, 'registrationTokens'),
+          where('token', '==', slug)
+        );
+        querySnapshot = await getDocs(q);
+      }
       
       if (querySnapshot.empty) {
+        console.log('❌ Token não encontrado no banco de dados');
         setError('Link não encontrado ou inválido');
         setLoading(false);
         return;
@@ -61,6 +110,7 @@ const SlugRegister = () => {
       
       const tokenDoc = querySnapshot.docs[0];
       const data = { id: tokenDoc.id, ...tokenDoc.data() } as RegistrationToken;
+      console.log('✅ Token encontrado:', { id: data.id, email: data.email, status: data.status });
       setTokenData(data);
 
       // Verificar se token expirou
@@ -68,6 +118,7 @@ const SlugRegister = () => {
       const expiresAt = new Date(data.expiresAt);
       
       if (now > expiresAt) {
+        console.log('⏰ Token expirado');
         setError('Este link de cadastro expirou. Solicite um novo convite ao administrador.');
         setLoading(false);
         return;
@@ -75,6 +126,7 @@ const SlugRegister = () => {
 
       // Verificar se token já foi usado
       if (data.status === 'used') {
+        console.log('🚫 Token já foi usado');
         setError('Este link de cadastro já foi utilizado. Cada link só pode ser usado uma vez.');
         setLoading(false);
         return;
@@ -88,6 +140,7 @@ const SlugRegister = () => {
       const existingUserSnapshot = await getDocs(existingUserQuery);
       
       if (!existingUserSnapshot.empty) {
+        console.log('👤 Usuário já existe');
         setError('Já existe uma conta cadastrada com este email.');
         setLoading(false);
         return;
@@ -101,12 +154,20 @@ const SlugRegister = () => {
       const deletedUserSnapshot = await getDocs(deletedUserQuery);
       
       if (!deletedUserSnapshot.empty) {
+        console.log('🗑️ Email foi deletado anteriormente');
         setError('Este email foi utilizado anteriormente e não pode ser reutilizado.');
         setLoading(false);
         return;
       }
 
+      // Verificar se código já foi verificado
+      if (data.codeVerified) {
+        console.log('✅ Código já verificado anteriormente');
+        setCodeVerified(true);
+      }
+
       // Token válido - permitir cadastro
+      console.log('✅ Token válido, permitindo cadastro');
       setError('');
       
     } catch (error) {
@@ -164,8 +225,8 @@ const SlugRegister = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!tokenData) {
-      setError('Token inválido');
+    if (!tokenData || !codeVerified) {
+      setError('Código de verificação não confirmado');
       return;
     }
 
@@ -177,10 +238,12 @@ const SlugRegister = () => {
     setIsSubmitting(true);
 
     try {
+      console.log('🚀 Iniciando processo de cadastro...');
+
       // Verificar novamente se token ainda é válido
       const tokenQuery = query(
         collection(db, 'registrationTokens'),
-        where('slug', '==', slug)
+        where(tokenData.slug ? 'slug' : 'token', '==', slug)
       );
       const tokenSnapshot = await getDocs(tokenQuery);
       
@@ -204,6 +267,14 @@ const SlugRegister = () => {
         return;
       }
 
+      if (!currentTokenData.codeVerified) {
+        setError('Código de verificação não confirmado');
+        setIsSubmitting(false);
+        return;
+      }
+
+      console.log('📧 Criando usuário no Firebase Auth...');
+
       // Criar usuário no Firebase Auth com o email do token
       const userCredential = await createUserWithEmailAndPassword(
         auth, 
@@ -211,6 +282,8 @@ const SlugRegister = () => {
         formData.password
       );
       const user = userCredential.user;
+
+      console.log('✅ Usuário criado no Firebase Auth:', user.uid);
 
       const transactionId = crypto.randomUUID();
       const now = new Date();
@@ -229,12 +302,15 @@ const SlugRegister = () => {
         createdAt: new Date().toISOString(),
         termsAcceptanceId: transactionId,
         registrationMethod: 'email_invite',
-        registrationSlug: slug
+        registrationSlug: slug,
+        emailVerified: true // Marcar como verificado automaticamente
       };
 
+      console.log('💾 Salvando dados do usuário no Firestore...');
       await setDoc(doc(db, 'users', user.uid), userData);
 
       // Criar registro de tokens
+      console.log('🎫 Criando registro de tokens...');
       await setDoc(doc(db, 'tokenUsage', user.uid), {
         uid: user.uid,
         email: tokenData.email.toLowerCase(),
@@ -246,6 +322,7 @@ const SlugRegister = () => {
       });
 
       // Registros de conformidade GDPR
+      console.log('📋 Criando registros GDPR...');
       await setDoc(doc(collection(db, 'gdprCompliance'), transactionId), {
         uid: user.uid,
         email: tokenData.email.toLowerCase(),
@@ -266,16 +343,25 @@ const SlugRegister = () => {
       });
 
       // Marcar token como usado
+      console.log('✅ Marcando token como usado...');
       await updateDoc(doc(db, 'registrationTokens', tokenData.id), {
         status: 'used',
         usedAt: new Date().toISOString(),
         usedBy: user.uid
       });
 
-      // Enviar email de verificação
-      await sendEmailVerification(user);
+      console.log('🎉 Cadastro concluído com sucesso! Redirecionando para login...');
 
-      navigate('/verify-email');
+      // Fazer logout para garantir que o usuário faça login novamente
+      await auth.signOut();
+
+      // Redirecionar para login com mensagem de sucesso
+      navigate('/login', { 
+        state: { 
+          message: 'Cadastro realizado com sucesso! Faça login para acessar a plataforma.',
+          email: tokenData.email
+        }
+      });
 
     } catch (error: any) {
       console.error('Registration error:', error);
@@ -362,6 +448,69 @@ const SlugRegister = () => {
           </div>
         )}
 
+        {/* Verificação de Código */}
+        {tokenData && !codeVerified && (
+          <div className="bg-gray-800 rounded-lg p-6 mb-6">
+            <div className="text-center mb-6">
+              <h2 className="text-xl font-bold text-white mb-2">Verificação de Código</h2>
+              <p className="text-gray-400 text-sm">
+                Um código de verificação foi enviado para <strong>{tokenData.email}</strong>. 
+                Digite o código para prosseguir com o cadastro.
+              </p>
+            </div>
+
+            <div className="space-y-4">
+              {error && (
+                <div className="text-red-500 text-center bg-red-900/20 p-3 rounded-md border border-red-800">
+                  {error}
+                </div>
+              )}
+
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Código de Verificação
+                </label>
+                <input
+                  type="text"
+                  value={verificationCode}
+                  onChange={(e) => setVerificationCode(e.target.value.toUpperCase())}
+                  className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-md text-white text-center text-lg font-mono tracking-widest focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="XXXXXX"
+                  maxLength={6}
+                  disabled={verifyingCode}
+                />
+              </div>
+
+              <button
+                onClick={handleVerifyCode}
+                disabled={verifyingCode || !verificationCode.trim()}
+                className={`w-full py-3 px-4 bg-blue-900 hover:bg-blue-800 rounded-md text-white text-lg font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors ${
+                  verifyingCode || !verificationCode.trim() ? 'opacity-50 cursor-not-allowed' : ''
+                }`}
+              >
+                {verifyingCode ? 'Verificando...' : 'Verificar Código'}
+              </button>
+            </div>
+
+            <div className="mt-6 pt-6 border-t border-gray-700">
+              <div className="bg-blue-900/20 border border-blue-600 rounded-lg p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <Mail size={16} className="text-blue-400" />
+                  <span className="text-blue-200 font-medium">Não recebeu o código?</span>
+                </div>
+                <ul className="text-blue-100 text-sm space-y-1">
+                  <li>• Verifique sua caixa de entrada e spam</li>
+                  <li>• O código tem 6 caracteres alfanuméricos</li>
+                  <li>• O código expira junto com o convite</li>
+                  <li>• Entre em contato com o administrador se necessário</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Formulário de Cadastro - só aparece após verificação do código */}
+        {codeVerified && (
         <div className="bg-gray-800 rounded-lg p-6">
           <div className="text-center mb-6">
             <img 
@@ -373,6 +522,10 @@ const SlugRegister = () => {
             <p className="text-gray-400 text-sm mt-2">
               Você foi convidado para criar uma conta com o email: <strong>{tokenData?.email}</strong>
             </p>
+            <div className="flex items-center justify-center gap-2 mt-3">
+              <CheckCircle size={16} className="text-green-400" />
+              <span className="text-green-400 text-sm font-medium">Código verificado com sucesso!</span>
+            </div>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -489,11 +642,12 @@ const SlugRegister = () => {
                 <li>• Você deve usar o email autorizado: <strong>{tokenData?.email}</strong></li>
                 <li>• Este convite expira em {tokenData ? formatTimeRemaining(tokenData.expiresAt) : 'tempo indeterminado'}</li>
                 <li>• Cada convite só pode ser usado uma vez</li>
-                <li>• Após o cadastro, você receberá um email de verificação</li>
+                <li>• Após o cadastro, você será redirecionado para fazer login</li>
               </ul>
             </div>
           </div>
         </div>
+        )}
       </div>
     </div>
   );

@@ -1,16 +1,28 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '../../firebase';
 import { useTranslation } from '../../utils/i18n';
 
 const Login = () => {
   const { t } = useTranslation();
+  const location = useLocation();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
+
+  // Pegar mensagem de sucesso do state (vinda do registro)
+  const successMessage = location.state?.message;
+  const prefilledEmail = location.state?.email;
+
+  // Preencher email se veio do registro
+  useState(() => {
+    if (prefilledEmail && !email) {
+      setEmail(prefilledEmail);
+    }
+  });
 
   const validateEmail = (email: string) => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -64,12 +76,6 @@ const Login = () => {
         throw new Error('No user data available');
       }
 
-      if (!user.emailVerified) {
-        await auth.signOut();
-        setError('Por favor, verifique seu email antes de fazer login.');
-        navigate('/verify-email');
-        return;
-      }
 
       setError('');
       navigate('/', { replace: true });
@@ -117,6 +123,11 @@ const Login = () => {
         </div>
 
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
+          {successMessage && (
+            <div className="text-green-500 text-center bg-green-900/20 p-3 rounded-md border border-green-800">
+              {successMessage}
+            </div>
+          )}
           {error && (
             <div className="text-red-500 text-center bg-red-900/20 p-3 rounded-md border border-red-800">
               {error}

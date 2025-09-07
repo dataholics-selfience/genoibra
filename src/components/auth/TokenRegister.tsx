@@ -267,10 +267,16 @@ const TokenRegister = () => {
         usedBy: user.uid
       });
 
-      // Enviar email de verificação
-      await sendEmailVerification(user);
+      // Fazer logout para garantir que o usuário faça login novamente
+      await auth.signOut();
 
-      navigate('/verify-email');
+      // Redirecionar para login com mensagem de sucesso
+      navigate('/login', {
+        state: {
+          message: 'Cadastro realizado com sucesso! Faça login para acessar a plataforma.',
+          email: tokenData.email
+        }
+      });
 
     } catch (error: any) {
       console.error('Registration error:', error);
