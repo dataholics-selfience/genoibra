@@ -18,6 +18,7 @@ import SudoAdminInterface from './components/admin/SudoAdminInterface';
 import TokenRegister from './components/auth/TokenRegister';
 import SlugRegister from './components/auth/SlugRegister';
 import PublicChallenge from './components/PublicChallenge';
+import PersonalizedLogin from './components/auth/PersonalizedLogin';
 
 function App() {
   const [user, setUser] = useState<any>(null);
@@ -81,6 +82,7 @@ function App() {
         <Route path="/invite/:slug" element={!user ? <SlugRegister /> : <Navigate to="/" replace />} />
         <Route path="/forgot-password" element={!user ? <ForgotPassword /> : <Navigate to="/" replace />} />
         <Route path="/challenge/:slug" element={<PublicChallenge />} />
+        <Route path="/login/:loginSlug" element={!user ? <PersonalizedLogin /> : <Navigate to="/" replace />} />
         
         {/* Protected Routes */}
         <Route path="/profile" element={user ? <UserManagement /> : <Navigate to="/login" replace />} />
