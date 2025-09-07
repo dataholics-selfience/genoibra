@@ -332,8 +332,11 @@ const MessageComposer = () => {
                 <div style="font-size: 14px; color: #666;">
                   <p><strong>Atenciosamente,</strong><br>
                   ${senderName}, ${senderCompany}</p>
-                  <p style="margin-top: 20px; color: #d32f2f; font-weight: bold;">
-                    Atenção: Este e-mail é confidencial e não pode ser encaminhado externamente nem para outros usuários do banco ou do Habitat.
+                  <p style="margin-top: 20px;">
+                    <strong>Gen.OI</strong><br>
+                    Conectando empresas às melhores startups do mundo<br>
+                    🌐 <a href="https://genoi.net" style="color: #667eea;">genoi.net</a><br>
+                    📧 <a href="mailto:contact@genoi.net" style="color: #667eea;">contact@genoi.net</a>
                   </p>
                 </div>
               </div>

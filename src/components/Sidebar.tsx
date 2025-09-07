@@ -258,7 +258,12 @@ const Sidebar = ({ isOpen, toggleSidebar, challenges, currentChallengeId, onSele
                           )}
                           <span className="truncate text-left flex-1">{challenge.title}</span>
                           {startups.length > 0 && (
-                            <Rocket size={14} className="text-gray-500" />
+                            <div className="flex items-center gap-1">
+                              <Rocket size={14} className="text-blue-400" />
+                              <span className="text-xs bg-blue-600 text-white px-1.5 py-0.5 rounded-full">
+                                {startups.reduce((total, list) => total + (list.startups?.length || 0), 0)}
+                              </span>
+                            </div>
                           )}
                         </div>
                         <div className="text-xs text-gray-500 pl-6 mt-1">

@@ -1,10 +1,103 @@
-import { MessageSquare } from 'lucide-react';
+import { useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { signInWithEmailAndPassword } from 'firebase/auth';
+import { auth } from '../../firebase';
+import { useTranslation } from '../../utils/i18n';
 
 const Login = () => {
-  const handleWhatsAppContact = () => {
-    const message = encodeURIComponent('Olá! Gostaria de solicitar acesso à plataforma Gen.OI. Poderia me ajudar?');
-    const whatsappUrl = `https://wa.me/5511995736666?text=${message}`;
-    window.open(whatsappUrl, '_blank');
+  const { t } = useTranslation();
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const navigate = useNavigate();
+
+  const validateEmail = (email: string) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email.trim());
+  };
+
+  const validateInputs = () => {
+    const trimmedEmail = email.trim();
+    const trimmedPassword = password.trim();
+
+    if (!trimmedEmail || !trimmedPassword) {
+      setError('Por favor, preencha todos os campos.');
+      return false;
+    }
+    if (!validateEmail(trimmedEmail)) {
+      setError('Por favor, insira um email válido.');
+      return false;
+    }
+    if (trimmedPassword.length < 6) {
+      setError('A senha deve ter pelo menos 6 caracteres.');
+      return false;
+    }
+    return true;
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    try {
+      setError('');
+      
+      if (!validateInputs()) {
+        return;
+      }
+
+      setIsLoading(true);
+
+      const trimmedEmail = email.trim().toLowerCase();
+      const trimmedPassword = password.trim();
+
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      const userCredential = await signInWithEmailAndPassword(
+        auth,
+        trimmedEmail,
+        trimmedPassword
+      );
+
+      const user = userCredential.user;
+      if (!user) {
+        throw new Error('No user data available');
+      }
+
+      if (!user.emailVerified) {
+        await auth.signOut();
+        setError('Por favor, verifique seu email antes de fazer login.');
+        navigate('/verify-email');
+        return;
+      }
+
+      setError('');
+      navigate('/', { replace: true });
+      
+    } catch (error: any) {
+      console.error('Login error:', error);
+      
+      const errorMessages: { [key: string]: string } = {
+        'auth/invalid-credential': 'Email ou senha incorretos. Por favor, verifique suas credenciais e tente novamente.',
+        'auth/user-disabled': 'Esta conta foi desativada. Entre em contato com o suporte.',
+        'auth/too-many-requests': 'Muitas tentativas de login. Por favor, aguarde alguns minutos e tente novamente.',
+        'auth/network-request-failed': 'Erro de conexão. Verifique sua internet e tente novamente.',
+        'auth/invalid-email': 'O formato do email é inválido.',
+        'auth/user-not-found': 'Não existe uma conta com este email.',
+        'auth/wrong-password': 'Senha incorreta.',
+        'auth/popup-closed-by-user': 'O processo de login foi interrompido. Por favor, tente novamente.',
+        'auth/operation-not-allowed': 'Este método de login não está habilitado. Entre em contato com o suporte.',
+        'auth/requires-recent-login': 'Por favor, faça login novamente para continuar.',
+      };
+
+      setError(
+        errorMessages[error.code] || 
+        'Ocorreu um erro ao fazer login. Por favor, verifique suas credenciais e tente novamente.'
+      );
+      
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -20,40 +113,66 @@ const Login = () => {
               e.currentTarget.src = 'fallback-logo.png';
             }}
           />
-          <h2 className="mt-6 text-3xl font-bold text-white">Acesso Restrito</h2>
-          <p className="mt-4 text-gray-400 text-lg">
-            Esta é uma plataforma privada de inovação aberta.
-          </p>
+          <h2 className="mt-6 text-3xl font-bold text-white">{t.login}</h2>
         </div>
 
-        <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
-          <div className="text-center">
-            <div className="w-16 h-16 bg-blue-900 rounded-full flex items-center justify-center mx-auto mb-4">
-              <MessageSquare size={32} className="text-blue-400" />
+        <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
+          {error && (
+            <div className="text-red-500 text-center bg-red-900/20 p-3 rounded-md border border-red-800">
+              {error}
             </div>
-            <h3 className="text-xl font-bold text-white mb-4">Como obter acesso?</h3>
-            <p className="text-gray-300 mb-6">
-              Para acessar a plataforma Gen.OI, você precisa ser autorizado por um administrador. 
-              Entre em contato conosco para solicitar seu acesso personalizado.
-            </p>
+          )}
+          
+          <div className="space-y-4">
+            <div>
+              <input
+                type="email"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder={t.email}
+                disabled={isLoading}
+                autoComplete="email"
+              />
+            </div>
+            <div>
+              <input
+                type="password"
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder={t.password}
+                disabled={isLoading}
+                minLength={6}
+                autoComplete="current-password"
+              />
+            </div>
+          </div>
+
+          <div>
             <button
-              onClick={handleWhatsAppContact}
-              className="w-full py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors font-medium text-lg"
+              type="submit"
+              disabled={isLoading}
+              className={`w-full py-3 px-4 bg-blue-900 hover:bg-blue-800 rounded-md text-white text-lg font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors ${
+                isLoading ? 'opacity-50 cursor-not-allowed' : ''
+              }`}
             >
-              Solicitar Acesso via WhatsApp
+              {isLoading ? 'Entrando...' : t.login}
             </button>
           </div>
-        </div>
 
-        <div className="bg-blue-900/20 border border-blue-600 rounded-lg p-4">
-          <h4 className="text-blue-200 font-medium mb-2">💡 Informações Importantes</h4>
-          <ul className="text-blue-100 text-sm space-y-1">
-            <li>• Cada usuário recebe uma URL personalizada de login</li>
-            <li>• O acesso é protegido por códigos de verificação por email</li>
-            <li>• Apenas usuários autorizados podem criar contas</li>
-            <li>• Entre em contato para solicitar seu acesso</li>
-          </ul>
-        </div>
+          <div className="flex items-center justify-between">
+            <Link 
+              to="/forgot-password" 
+              className="text-sm text-blue-400 hover:text-blue-500"
+              tabIndex={isLoading ? -1 : 0}
+            >
+              {t.forgotPassword}
+            </Link>
+          </div>
+        </form>
       </div>
     </div>
   );

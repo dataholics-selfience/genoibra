@@ -170,15 +170,9 @@ const Register = () => {
         usedAt: new Date().toISOString(),
         usedBy: user.uid
       });
+      await sendEmailVerification(user);
 
-      // Logout and redirect to login with success message
-      await auth.signOut();
-      navigate('/login', {
-        state: {
-          message: 'Cadastro realizado com sucesso! Faça login para acessar a plataforma.',
-          email: formData.email.trim()
-        }
-      });
+      navigate('/verify-email');
     } catch (error: any) {
       console.error('Registration error:', error);
       if (error.code === 'auth/email-already-in-use') {
