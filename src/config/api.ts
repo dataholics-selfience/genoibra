@@ -1,6 +1,6 @@
 export const API_CONFIG = {
   webhook: {
-    url: 'http://n8n.genoiapp.com:5678/webhook/genoibra',
+    url: 'https://webhook.genoiapp.com/webhook/production',
     headers: {
       'Content-Type': 'application/json'
     }
