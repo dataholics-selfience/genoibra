@@ -547,16 +547,9 @@ const PublicChallenge = () => {
           <p className="text-gray-300 mb-2">
             Powered by <strong className="text-blue-400">Gen.OI</strong> - Plataforma de Inovação Aberta
           </p>
-          <a 
-            href="https://genoi.net" 
-            target="_blank" 
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 text-blue-400 hover:text-blue-300 transition-colors"
-          >
-            <Globe size={16} />
-            genoi.net
-            <ExternalLink size={14} />
-          </a>
+          <p className="text-red-400 text-sm font-medium">
+            Atenção: Este conteúdo é confidencial e não pode ser encaminhado externamente nem para outros usuários do banco ou do Habitat.
+          </p>
         </div>
       </div>
     </div>

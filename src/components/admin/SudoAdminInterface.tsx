@@ -83,7 +83,10 @@ const SudoAdminInterface = () => {
     const now = new Date();
     const expiresAt = new Date(now.getTime() + 12 * 60 * 60 * 1000); // 12 horas
     
-    const registrationUrl = `${window.location.origin}/invite/${slug}`;
+    // Usar domínio correto baseado no ambiente
+    const isProduction = window.location.hostname === 'www.genoiapp.com' || window.location.hostname === 'genoiapp.com';
+    const baseUrl = isProduction ? 'https://www.genoiapp.com' : window.location.origin;
+    const registrationUrl = `${baseUrl}/invite/${slug}`;
     
     try {
       // Gerar QR Code
@@ -159,10 +162,9 @@ const SudoAdminInterface = () => {
               
               <hr style="border: none; border-top: 1px solid #eee; margin: 25px 0;">
               <div style="font-size: 14px; color: #666;">
-                <p><strong>Gen.OI</strong><br>
-                Conectando empresas às melhores startups do mundo<br>
-                🌐 <a href="https://genoi.net" style="color: #667eea;">genoi.net</a><br>
-                📧 <a href="mailto:contact@genoi.net" style="color: #667eea;">contact@genoi.net</a></p>
+                <p style="color: #d32f2f; font-weight: bold;">
+                  Atenção: Este e-mail é confidencial e não pode ser encaminhado externamente nem para outros usuários do banco ou do Habitat.
+                </p>
               </div>
             </div>
           </div>
