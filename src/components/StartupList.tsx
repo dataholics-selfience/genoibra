@@ -1,18 +1,18 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
-  Star, Calendar, Building2, MapPin, Users, Briefcase, Award, Edit, Save, X,
-  Target, Rocket, ArrowLeft, Mail, Globe, Box, Linkedin,
-  Facebook, Twitter, Instagram, FolderOpen, Plus, Check, BarChart3, Download,
-  Phone, DollarSign, TrendingUp, CheckCircle, AlertCircle
+  Star, Calendar, Building2, MapPin, Users, Briefcase, Award, 
+  Target, Rocket, ArrowLeft, Globe, Box, Linkedin,
+  Facebook, Twitter, Instagram, Heart, HeartOff, Plus, Check, X,
+  Mail, Phone, User, TrendingUp, DollarSign, CheckCircle, Download,
+  Shield, Code, Tag, Zap, ExternalLink
 } from 'lucide-react';
-import { collection, query, orderBy, limit, getDocs, addDoc, where, deleteDoc, doc, updateDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, addDoc, deleteDoc, doc } from 'firebase/firestore';
 import { db, auth } from '../firebase';
-import { StartupListType, StartupType, SocialLink } from '../types';
+import { StartupType, StartupListType, SocialLink } from '../types';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useTranslation } from '../utils/i18n';
-import { Link } from 'react-router-dom';
 import html2pdf from 'html2pdf.js';
 
 interface SavedStartupType {
@@ -28,28 +28,18 @@ interface SavedStartupType {
   updatedAt: string;
 }
 
-interface PipelineStage {
-  id: string;
-  name: string;
-  color: string;
-  order: number;
-}
-
-const DEFAULT_STAGES: PipelineStage[] = [
-  { id: 'mapeada', name: 'Mapeada', color: 'bg-yellow-200 text-yellow-800 border-yellow-300', order: 0 },
-  { id: 'selecionada', name: 'Selecionada', color: 'bg-blue-200 text-blue-800 border-blue-300', order: 1 },
-  { id: 'contatada', name: 'Contatada', color: 'bg-red-200 text-red-800 border-red-300', order: 2 },
-  { id: 'entrevistada', name: 'Entrevistada', color: 'bg-green-200 text-green-800 border-green-300', order: 3 },
-  { id: 'poc', name: 'POC', color: 'bg-orange-200 text-orange-800 border-orange-300', order: 4 }
-];
+const formatValue = (value: any, fallback: string = 'Não informado'): string => {
+  if (!value || value === 'NÃO DIVULGADO' || value === 'N/A' || value === '') {
+    return fallback;
+  }
+  return String(value);
+};
 
 const StarRating = ({ rating }: { rating: number }) => {
-  const { t } = useTranslation();
-  
   return (
     <div className="bg-gray-800 rounded-lg p-3 flex flex-col items-center">
       <span className="text-3xl font-extrabold text-white">{rating}</span>
-      <div className="text-sm text-gray-400 mt-1">{t.matchScore}</div>
+      <div className="text-sm text-gray-400 mt-1">Match Score</div>
       <div className="flex items-center gap-1 mt-1">
         {[1, 2, 3, 4, 5].map((star) => (
           <Star
@@ -67,99 +57,45 @@ const StarRating = ({ rating }: { rating: number }) => {
   );
 };
 
-const ProjectTimeline = ({ planning }: { planning: StartupListType['projectPlanning'] }) => {
-  const { t } = useTranslation();
-  
-  return (
-    <div className="space-y-8 relative before:absolute before:inset-0 before:ml-5 before:h-full before:w-0.5 before:bg-gradient-to-b before:from-blue-500 before:via-purple-500 before:to-pink-500">
-      {(planning || []).map((phase, index) => (
-        <div key={index} className="relative flex items-start gap-6 group">
-          <div className="flex items-center justify-center w-10 h-10 rounded-full border-2 border-blue-600 bg-gray-900 text-blue-600 font-bold">
-            {index + 1}
-          </div>
-          <div className="flex flex-col items-start">
-            <span className="text-sm text-blue-400">{phase.duration}</span>
-            <h3 className="text-xl font-bold text-white mb-2">{phase.phase}</h3>
-            <p className="text-gray-400">{phase.description}</p>
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-};
-
-const ResultsSection = ({ data }: { data: StartupListType }) => {
-  const { t } = useTranslation();
-  
-  return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-      <div className="bg-gradient-to-br from-blue-900/50 to-purple-900/50 p-6 rounded-xl">
-        <h3 className="text-xl font-bold text-white mb-4">{t.expectedResults}</h3>
-        <ul className="space-y-4">
-          {(data.expectedResults || []).map((result, index) => (
-            <li key={index} className="flex items-start gap-3">
-              <Target className="text-blue-400 mt-1" size={20} />
-              <span className="text-gray-300">{result}</span>
-            </li>
-          ))}
-        </ul>
-      </div>
-      <div className="bg-gradient-to-br from-purple-900/50 to-pink-900/50 p-6 rounded-xl">
-        <h3 className="text-xl font-bold text-white mb-4">{t.competitiveAdvantages}</h3>
-        <ul className="space-y-4">
-          {(data.competitiveAdvantages || []).map((advantage, index) => (
-            <li key={index} className="flex items-start gap-3">
-              <Award className="text-purple-400 mt-1" size={20} />
-              <span className="text-gray-300">{advantage}</span>
-            </li>
-          ))}
-        </ul>
-      </div>
-    </div>
-  );
-};
-
 const SocialLinks = ({ startup, className = "" }: { startup: StartupType; className?: string }) => {
-  const { t } = useTranslation();
-  
   const links: SocialLink[] = [
     {
       type: 'website',
       url: startup.website,
       icon: Globe,
-      label: t.website
+      label: 'Website'
     },
     {
       type: 'email',
       url: `mailto:${startup.email}`,
       icon: Mail,
-      label: t.email
+      label: 'Email'
     },
     ...(startup.socialLinks?.linkedin ? [{
       type: 'linkedin',
       url: startup.socialLinks.linkedin,
       icon: Linkedin,
-      label: t.linkedin
+      label: 'LinkedIn'
     }] : []),
     ...(startup.socialLinks?.facebook ? [{
       type: 'facebook',
       url: startup.socialLinks.facebook,
       icon: Facebook,
-      label: t.facebook
+      label: 'Facebook'
     }] : []),
     ...(startup.socialLinks?.twitter ? [{
       type: 'twitter',
       url: startup.socialLinks.twitter,
       icon: Twitter,
-      label: t.twitter
+      label: 'Twitter'
     }] : []),
     ...(startup.socialLinks?.instagram ? [{
       type: 'instagram',
       url: startup.socialLinks.instagram,
       icon: Instagram,
-      label: t.instagram
+      label: 'Instagram'
     }] : [])
-  ].filter(link => link.url && link.url !== 'NÃO DIVULGADO');
+  ].filter(link => link.url && link.url !== 'mailto:' && !link.url.includes('NÃO DIVULGADO'));
 
   return (
     <div className={`flex flex-wrap gap-3 ${className}`}>
@@ -180,604 +116,358 @@ const SocialLinks = ({ startup, className = "" }: { startup: StartupType; classN
   );
 };
 
-const formatValue = (value: any, fallback: string = 'Não informado'): string => {
-  if (!value || value === 'NÃO DIVULGADO' || value === 'N/A' || value === '') {
-    return fallback;
-  }
-  return String(value);
-};
-
 const StartupCard = ({ 
   startup, 
-  onClick, 
-  challengeTitle, 
-  challengeId,
-  onStartupSaved,
-  onStartupUpdated
+  isSaved, 
+  onToggleSave,
+  onClick
 }: { 
-  startup: StartupType; 
+  startup: StartupType;
+  isSaved: boolean;
+  onToggleSave: (startup: StartupType) => void;
   onClick: () => void;
-  challengeTitle: string;
-  challengeId: string;
-  onStartupSaved: () => void;
-  onStartupUpdated: (updatedStartup: StartupType) => void;
 }) => {
-  const { t } = useTranslation();
-  const [isSaving, setIsSaving] = useState(false);
-  const [savedStartup, setSavedStartup] = useState<SavedStartupType | null>(null);
-  const [pipelineStages, setPipelineStages] = useState<PipelineStage[]>(DEFAULT_STAGES);
-  const [isEditing, setIsEditing] = useState(false);
-  const [editData, setEditData] = useState<StartupType>(startup);
+  const [isToggling, setIsToggling] = useState(false);
 
-  useEffect(() => {
-    const checkIfSaved = async () => {
-      if (!auth.currentUser) return;
-      
-      try {
-        const q = query(
-          collection(db, 'selectedStartups'),
-          where('userId', '==', auth.currentUser.uid),
-          where('startupName', '==', startup.name)
-        );
-        const querySnapshot = await getDocs(q);
-        if (!querySnapshot.empty) {
-          const savedData = { id: querySnapshot.docs[0].id, ...querySnapshot.docs[0].data() } as SavedStartupType;
-          setSavedStartup(savedData);
-        }
-      } catch (error) {
-        console.error('Error checking if startup is saved:', error);
-      }
-    };
-
-    checkIfSaved();
-  }, [startup.name]);
-
-  useEffect(() => {
-    const loadStages = async () => {
-      if (!auth.currentUser) return;
-
-      try {
-        const stagesDoc = await getDocs(query(collection(db, 'pipelineStages'), where('userId', '==', auth.currentUser.uid)));
-        if (!stagesDoc.empty) {
-          const userStages = stagesDoc.docs[0].data().stages as PipelineStage[];
-          const sortedStages = userStages.sort((a, b) => a.order - b.order);
-          setPipelineStages(sortedStages);
-        }
-      } catch (error) {
-        console.error('Error loading stages:', error);
-      }
-    };
-
-    loadStages();
-  }, []);
-
-  const handleSaveEdit = async () => {
-    try {
-      onStartupUpdated(editData);
-      setIsEditing(false);
-    } catch (error) {
-      console.error('Error updating startup:', error);
-    }
-  };
-
-  const handleEditChange = (field: string, value: any) => {
-    if (field.includes('.')) {
-      const [parent, child] = field.split('.');
-      setEditData(prev => ({
-        ...prev,
-        [parent]: {
-          ...(prev as any)[parent],
-          [child]: value
-        }
-      }));
-    } else {
-      setEditData(prev => ({
-        ...prev,
-        [field]: value
-      }));
-    }
-  };
-
-  const handleSelectStartup = async (e: React.MouseEvent) => {
+  const handleToggleSave = async (e: React.MouseEvent) => {
     e.stopPropagation();
     
-    if (!auth.currentUser || isSaving) return;
+    if (isToggling) return;
 
-    setIsSaving(true);
-
-    try {
-      if (savedStartup) {
-        await deleteDoc(doc(db, 'selectedStartups', savedStartup.id));
-        setSavedStartup(null);
-      } else {
-        const docRef = await addDoc(collection(db, 'selectedStartups'), {
-          userId: auth.currentUser.uid,
-          userEmail: auth.currentUser.email,
-          challengeId,
-          challengeTitle,
-          startupName: startup.name,
-          startupData: startup,
-          selectedAt: new Date().toISOString(),
-          stage: 'mapeada',
-          updatedAt: new Date().toISOString()
-        });
-        
-        const newSavedStartup = {
-          id: docRef.id,
-          userId: auth.currentUser.uid,
-          userEmail: auth.currentUser.email || '',
-          challengeId,
-          challengeTitle,
-          startupName: startup.name,
-          startupData: startup,
-          selectedAt: new Date().toISOString(),
-          stage: 'mapeada',
-          updatedAt: new Date().toISOString()
-        };
-        
-        setSavedStartup(newSavedStartup);
-      }
-
-      onStartupSaved();
-    } catch (error) {
-      console.error('Error saving/removing startup:', error);
-    } finally {
-      setIsSaving(false);
-    }
+    setIsToggling(true);
+    await onToggleSave(startup);
+    setIsToggling(false);
   };
 
-  const getCurrentStage = () => {
-    if (!savedStartup) return null;
-    return pipelineStages.find(stage => stage.id === savedStartup.stage);
+  const handleCardClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onClick();
   };
-
-  const currentStage = getCurrentStage();
-  const displayData = isEditing ? editData : startup;
 
   return (
-    <div className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-xl p-6 hover:scale-105 transition-transform">
+    <div
+      onClick={handleCardClick}
+      className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-xl p-6 cursor-pointer hover:from-gray-800 hover:to-gray-700 transition-all duration-300 shadow-lg hover:shadow-xl border border-gray-700 hover:border-gray-600"
+    >
       <div className="flex justify-between items-start mb-4">
         <div className="space-y-3 flex-1">
           <div className="flex items-center gap-3">
-            {isEditing ? (
-              <input
-                type="text"
-                value={editData.name}
-                onChange={(e) => handleEditChange('name', e.target.value)}
-                className="text-xl font-bold bg-gray-700 border border-gray-600 rounded px-2 py-1 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            ) : (
-              <h2 
-                className="text-xl font-bold text-white cursor-pointer hover:text-blue-300"
-                onClick={onClick}
-              >
-                {displayData.name}
-              </h2>
-            )}
+            <h3 className="text-xl font-bold text-white">{startup.name}</h3>
             <div className="flex items-center gap-2">
-              <span className="bg-blue-600 text-white text-sm px-3 py-1 rounded-full font-bold">
-                #{displayData.sequentialNumber || 'N/A'}
-              </span>
-              {displayData.websiteValidated && (
-                <CheckCircle size={16} className="text-green-400" title="Website validado" />
+              {startup.sequentialNumber && (
+                <span className="bg-blue-600 text-white text-sm px-2 py-1 rounded-full font-bold">
+                  #{startup.sequentialNumber}
+                </span>
+              )}
+              {startup.websiteValidated && (
+                <CheckCircle size={16} className="text-green-500" title="Website Validado" />
               )}
             </div>
-            <button
-              onClick={() => setIsEditing(!isEditing)}
-              className="text-gray-400 hover:text-white p-1 rounded"
-            >
-              {isEditing ? <X size={16} /> : <Edit size={16} />}
-            </button>
-            <button
-              onClick={handleSelectStartup}
-              disabled={isSaving}
-              className={`flex items-center gap-2 px-3 py-1 rounded-lg text-sm font-medium transition-all ${
-                savedStartup
-                  ? 'bg-red-600 hover:bg-red-700 text-white'
-                  : isSaving
-                  ? 'bg-gray-600 text-gray-300 cursor-not-allowed'
-                  : 'bg-blue-600 hover:bg-blue-700 text-white'
-              }`}
-            >
-              {savedStartup ? (
-                <>
-                  <X size={16} />
-                  {t.removeFromPipeline || 'Remover'}
-                </>
-              ) : isSaving ? (
-                <>
-                  <div className="w-4 h-4 border-2 border-gray-300 border-t-transparent rounded-full animate-spin" />
-                  {t.saving}
-                </>
-              ) : (
-                <>
-                  <Plus size={16} />
-                  {t.selectStartup}
-                </>
-              )}
-            </button>
           </div>
-          {currentStage && (
-            <div className="flex items-center gap-2">
-              <span className={`px-2 py-1 rounded-full text-xs font-medium border ${currentStage.color}`}>
-                {currentStage.name}
-              </span>
-            </div>
-          )}
-          <SocialLinks startup={displayData} />
+          <SocialLinks startup={startup} />
         </div>
-        <div className="flex flex-col items-end gap-2">
-          <StarRating rating={displayData.rating} />
-          {isEditing && (
-            <select
-              value={editData.rating}
-              onChange={(e) => handleEditChange('rating', parseInt(e.target.value))}
-              className="bg-gray-700 border border-gray-600 rounded px-2 py-1 text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              {[1, 2, 3, 4, 5].map(num => (
-                <option key={num} value={num}>{num}</option>
-              ))}
-            </select>
-          )}
+        <div className="flex items-center gap-3">
+          <StarRating rating={startup.rating} />
+          <button
+            onClick={handleToggleSave}
+            disabled={isToggling}
+            className={`p-2 rounded-full transition-all ${
+              isToggling
+                ? 'text-gray-500 cursor-not-allowed'
+                : isSaved
+                ? 'text-red-500 hover:text-red-400 hover:bg-red-900/20'
+                : 'text-gray-400 hover:text-red-500 hover:bg-red-900/20'
+            }`}
+          >
+            {isToggling ? (
+              <div className="w-6 h-6 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
+            ) : isSaved ? (
+              <Heart size={24} className="fill-current" />
+            ) : (
+              <HeartOff size={24} />
+            )}
+          </button>
         </div>
       </div>
-      
-      {isEditing ? (
-        <textarea
-          value={editData.description}
-          onChange={(e) => handleEditChange('description', e.target.value)}
-          className="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 text-gray-300 mb-6 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
-          rows={3}
-        />
-      ) : (
-        <p className="text-gray-400 mb-6 cursor-pointer hover:text-gray-300" onClick={onClick}>
-          {formatValue(displayData.description)}
-        </p>
-      )}
-      
-      <div className="grid grid-cols-2 gap-4 mb-4">
+
+      <p className="text-gray-400 mb-6 leading-relaxed">{startup.description}</p>
+
+      <div className="grid grid-cols-2 gap-4 mb-6">
         <div className="space-y-3">
           <div className="flex items-center gap-2 text-gray-300">
             <Calendar className="text-blue-400" size={16} />
-            {isEditing ? (
-              <input
-                type="text"
-                value={editData.foundedYear}
-                onChange={(e) => handleEditChange('foundedYear', e.target.value)}
-                className="bg-gray-700 border border-gray-600 rounded px-2 py-1 text-white text-sm w-20 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            ) : (
-              formatValue(displayData.foundedYear)
-            )}
+            <span className="text-gray-400">Fundação:</span>
+            {formatValue(startup.foundedYear)}
           </div>
           <div className="flex items-center gap-2 text-gray-300">
             <Building2 className="text-purple-400" size={16} />
-            {isEditing ? (
-              <input
-                type="text"
-                value={editData.category}
-                onChange={(e) => handleEditChange('category', e.target.value)}
-                className="bg-gray-700 border border-gray-600 rounded px-2 py-1 text-white text-sm flex-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            ) : (
-              formatValue(displayData.category)
-            )}
+            <span className="text-gray-400">Categoria:</span>
+            {formatValue(startup.category)}
           </div>
           <div className="flex items-center gap-2 text-gray-300">
             <Box className="text-pink-400" size={16} />
-            {isEditing ? (
-              <input
-                type="text"
-                value={editData.vertical}
-                onChange={(e) => handleEditChange('vertical', e.target.value)}
-                className="bg-gray-700 border border-gray-600 rounded px-2 py-1 text-white text-sm flex-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            ) : (
-              formatValue(displayData.vertical)
-            )}
+            <span className="text-gray-400">Vertical:</span>
+            {formatValue(startup.vertical)}
           </div>
           <div className="flex items-center gap-2 text-gray-300">
             <MapPin className="text-emerald-400" size={16} />
-            {isEditing ? (
-              <input
-                type="text"
-                value={editData.city}
-                onChange={(e) => handleEditChange('city', e.target.value)}
-                className="bg-gray-700 border border-gray-600 rounded px-2 py-1 text-white text-sm flex-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            ) : (
-              formatValue(displayData.city)
-            )}
+            <span className="text-gray-400">Localização:</span>
+            {formatValue(startup.city)}
+            {startup.state && startup.state !== 'NÃO DIVULGADO' && `, ${startup.state}`}
+            {startup.country && startup.country !== 'NÃO DIVULGADO' && `, ${startup.country}`}
           </div>
         </div>
         <div className="space-y-3">
           <div className="flex items-center gap-2 text-gray-300">
             <Users className="text-blue-400" size={16} />
-            {isEditing ? (
-              <input
-                type="text"
-                value={editData.teamSize}
-                onChange={(e) => handleEditChange('teamSize', e.target.value)}
-                className="bg-gray-700 border border-gray-600 rounded px-2 py-1 text-white text-sm flex-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            ) : (
-              formatValue(displayData.teamSize)
-            )}
+            <span className="text-gray-400">Equipe:</span>
+            {formatValue(startup.teamSize)}
           </div>
           <div className="flex items-center gap-2 text-gray-300">
             <Briefcase className="text-purple-400" size={16} />
-            {isEditing ? (
-              <input
-                type="text"
-                value={editData.businessModel}
-                onChange={(e) => handleEditChange('businessModel', e.target.value)}
-                className="bg-gray-700 border border-gray-600 rounded px-2 py-1 text-white text-sm flex-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            ) : (
-              formatValue(displayData.businessModel)
-            )}
+            <span className="text-gray-400">Modelo:</span>
+            {formatValue(startup.businessModel)}
           </div>
           <div className="flex items-center gap-2 text-gray-300">
-            <Globe className="text-pink-400" size={16} />
-            {isEditing ? (
-              <select
-                value={editData.ipoStatus}
-                onChange={(e) => handleEditChange('ipoStatus', e.target.value)}
-                className="bg-gray-700 border border-gray-600 rounded px-2 py-1 text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="private">Private</option>
-                <option value="public">Public</option>
-                <option value="acquired">Acquired</option>
-                <option value="NÃO DIVULGADO">Não Divulgado</option>
-              </select>
-            ) : (
-              formatValue(displayData.ipoStatus)
-            )}
+            <TrendingUp className="text-pink-400" size={16} />
+            <span className="text-gray-400">Status IPO:</span>
+            {formatValue(startup.ipoStatus)}
           </div>
           <div className="flex items-center gap-2 text-gray-300">
-            <TrendingUp className="text-yellow-400" size={16} />
-            <span className="text-sm">
-              Completude: {displayData.dataCompleteness || 50}%
-            </span>
+            <Award className="text-yellow-400" size={16} />
+            <span className="text-gray-400">Funcionários:</span>
+            {formatValue(startup.employees)}
           </div>
         </div>
       </div>
 
-      {/* Additional Information */}
-      <div className="space-y-3 mb-4">
-        {displayData.employees && displayData.employees !== 'NÃO DIVULGADO' && (
+      {/* Additional Fields */}
+      <div className="space-y-3 mb-6">
+        {startup.legalName && startup.legalName !== 'NÃO DIVULGADO' && (
           <div className="flex items-center gap-2 text-gray-300">
-            <Users className="text-green-400" size={16} />
-            <span className="text-sm">Funcionários: {formatValue(displayData.employees)}</span>
+            <Shield className="text-blue-400" size={16} />
+            <span className="text-gray-400">Razão Social:</span>
+            {startup.legalName}
           </div>
         )}
-        {displayData.stage && displayData.stage !== 'NÃO DIVULGADO' && (
+        
+        {startup.founder && startup.founder !== 'NÃO DIVULGADO' && (
           <div className="flex items-center gap-2 text-gray-300">
-            <Rocket className="text-orange-400" size={16} />
-            <span className="text-sm">Estágio: {formatValue(displayData.stage)}</span>
+            <User className="text-green-400" size={16} />
+            <span className="text-gray-400">Fundador:</span>
+            {startup.founder}
           </div>
         )}
-        {displayData.founder && displayData.founder !== 'NÃO DIVULGADO' && (
+
+        {startup.founderLinkedIn && startup.founderLinkedIn !== 'NÃO DIVULGADO' && (
           <div className="flex items-center gap-2 text-gray-300">
-            <Users className="text-purple-400" size={16} />
-            <span className="text-sm">Fundador: {formatValue(displayData.founder)}</span>
+            <Linkedin className="text-blue-500" size={16} />
+            <span className="text-gray-400">LinkedIn do Fundador:</span>
+            <a 
+              href={startup.founderLinkedIn} 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="text-blue-400 hover:text-blue-300 transition-colors"
+              onClick={(e) => e.stopPropagation()}
+            >
+              Ver perfil
+            </a>
+          </div>
+        )}
+
+        {startup.stage && startup.stage !== 'NÃO DIVULGADO' && (
+          <div className="flex items-center gap-2 text-gray-300">
+            <Target className="text-purple-400" size={16} />
+            <span className="text-gray-400">Estágio:</span>
+            {startup.stage}
+          </div>
+        )}
+
+        {startup.technologies && startup.technologies !== 'NÃO DIVULGADO' && (
+          <div className="flex items-center gap-2 text-gray-300">
+            <Code className="text-cyan-400" size={16} />
+            <span className="text-gray-400">Tecnologias:</span>
+            {startup.technologies}
+          </div>
+        )}
+
+        {startup.dataCompleteness && (
+          <div className="flex items-center gap-2 text-gray-300">
+            <BarChart3 className="text-orange-400" size={16} />
+            <span className="text-gray-400">Completude dos Dados:</span>
+            <span className="text-orange-400 font-bold">{startup.dataCompleteness}%</span>
           </div>
         )}
       </div>
 
       {/* Tags */}
-      {displayData.tags && displayData.tags !== 'NÃO DIVULGADO' && (
-        <div className="mb-4">
+      {startup.tags && startup.tags !== 'NÃO DIVULGADO' && (
+        <div className="mb-6">
+          <div className="flex items-center gap-2 mb-2">
+            <Tag className="text-pink-400" size={16} />
+            <span className="text-gray-400 text-sm">Tags:</span>
+          </div>
           <div className="flex flex-wrap gap-2">
-            {displayData.tags.split(',').map((tag, index) => (
-              <span key={index} className="bg-blue-900/50 text-blue-200 px-2 py-1 rounded-full text-xs">
+            {startup.tags.split(',').map((tag, index) => (
+              <span key={index} className="bg-gray-700 text-gray-300 px-2 py-1 rounded-full text-xs border border-gray-600">
                 {tag.trim()}
               </span>
             ))}
           </div>
         </div>
       )}
-      
-      {isEditing && (
-        <div className="mt-4 pt-4 border-t border-gray-700 flex gap-2">
-          <button
-            onClick={handleSaveEdit}
-            className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors"
-          >
-            <Save size={16} />
-            Salvar
-          </button>
-          <button
-            onClick={() => {
-              setIsEditing(false);
-              setEditData(startup);
-            }}
-            className="flex items-center gap-2 px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg transition-colors"
-          >
-            <X size={16} />
-            Cancelar
-          </button>
+
+      {/* Key Strengths */}
+      {startup.keyStrengths && startup.keyStrengths.length > 0 && startup.keyStrengths[0] !== 'NÃO DIVULGADO' && (
+        <div className="mb-6">
+          <div className="flex items-center gap-2 mb-2">
+            <Zap className="text-yellow-400" size={16} />
+            <span className="text-gray-400 text-sm">Principais Forças:</span>
+          </div>
+          <div className="space-y-1">
+            {startup.keyStrengths.map((strength, index) => (
+              <div key={index} className="flex items-center gap-2">
+                <div className="w-2 h-2 bg-yellow-400 rounded-full" />
+                <span className="text-gray-300 text-sm">{strength}</span>
+              </div>
+            ))}
+          </div>
         </div>
       )}
-      
+
+      {/* Solution Details */}
+      {startup.solution && (
+        <div className="mb-6">
+          <h4 className="text-white font-medium mb-3 flex items-center gap-2">
+            <Building2 className="text-blue-400" size={16} />
+            Detalhes da Solução
+          </h4>
+          <div className="bg-gray-800 rounded-lg p-4 space-y-2">
+            {startup.solution.porte && startup.solution.porte !== 'NÃO DIVULGADO' && (
+              <div className="flex justify-between">
+                <span className="text-gray-400">Porte:</span>
+                <span className="text-white">{startup.solution.porte}</span>
+              </div>
+            )}
+            {startup.solution.investimentos && startup.solution.investimentos !== 'NÃO DIVULGADO' && (
+              <div className="flex justify-between">
+                <span className="text-gray-400">Investimentos:</span>
+                <span className="text-white">{startup.solution.investimentos}</span>
+              </div>
+            )}
+            {startup.solution.recebeuAporte && startup.solution.recebeuAporte !== 'NÃO DIVULGADO' && (
+              <div className="flex justify-between">
+                <span className="text-gray-400">Recebeu Aporte:</span>
+                <span className="text-white">{startup.solution.recebeuAporte}</span>
+              </div>
+            )}
+            {startup.solution.valuation && startup.solution.valuation !== 'NÃO DIVULGADO' && (
+              <div className="flex justify-between">
+                <span className="text-gray-400">Valuation:</span>
+                <span className="text-white">{startup.solution.valuation}</span>
+              </div>
+            )}
+            {startup.solution.principaisClientes && startup.solution.principaisClientes !== 'NÃO DIVULGADO' && (
+              <div className="flex justify-between">
+                <span className="text-gray-400">Principais Clientes:</span>
+                <span className="text-white">{startup.solution.principaisClientes}</span>
+              </div>
+            )}
+            {startup.solution.numeroColaboradores && startup.solution.numeroColaboradores !== 'NÃO DIVULGADO' && (
+              <div className="flex justify-between">
+                <span className="text-gray-400">Colaboradores:</span>
+                <span className="text-white">{startup.solution.numeroColaboradores}</span>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Founders */}
+      {startup.fundadores && startup.fundadores.length > 0 && (
+        <div className="mb-6">
+          <h4 className="text-white font-medium mb-3 flex items-center gap-2">
+            <User className="text-green-400" size={16} />
+            Fundadores
+          </h4>
+          <div className="space-y-3">
+            {startup.fundadores.map((founder, index) => (
+              <div key={index} className="bg-gray-800 rounded-lg p-3">
+                <div className="font-medium text-white mb-1">{formatValue(founder.nome)}</div>
+                {founder.formacao && founder.formacao !== 'NÃO DIVULGADO' && (
+                  <div className="text-sm text-gray-400">Formação: {founder.formacao}</div>
+                )}
+                {founder.experiencia && founder.experiencia !== 'NÃO DIVULGADO' && (
+                  <div className="text-sm text-gray-400">Experiência: {founder.experiencia}</div>
+                )}
+                {founder.perfil && founder.perfil !== 'NÃO DIVULGADO' && (
+                  <div className="text-sm text-gray-400">Perfil: {founder.perfil}</div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Partners */}
+      {startup.parceiros && startup.parceiros.length > 0 && (
+        <div className="mb-6">
+          <h4 className="text-white font-medium mb-3 flex items-center gap-2">
+            <Users className="text-purple-400" size={16} />
+            Parceiros
+          </h4>
+          <div className="space-y-2">
+            {startup.parceiros.map((partner, index) => (
+              <div key={index} className="bg-gray-800 rounded-lg p-3">
+                <span className="text-gray-300">{typeof partner === 'string' ? partner : JSON.stringify(partner)}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Opportunities */}
+      {startup.oportunidades && startup.oportunidades.length > 0 && (
+        <div className="mb-6">
+          <h4 className="text-white font-medium mb-3 flex items-center gap-2">
+            <Target className="text-yellow-400" size={16} />
+            Oportunidades
+          </h4>
+          <div className="space-y-2">
+            {startup.oportunidades.map((opportunity, index) => (
+              <div key={index} className="bg-gray-800 rounded-lg p-3">
+                <span className="text-gray-300">{typeof opportunity === 'string' ? opportunity : JSON.stringify(opportunity)}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Problem Solution */}
+      {startup.problemaSolve && startup.problemaSolve !== 'NÃO DIVULGADO' && (
+        <div className="mb-6">
+          <h4 className="text-white font-medium mb-3 flex items-center gap-2">
+            <Target className="text-red-400" size={16} />
+            Problema que Resolve
+          </h4>
+          <div className="bg-gray-800 rounded-lg p-4">
+            <p className="text-gray-300 leading-relaxed">{startup.problemaSolve}</p>
+          </div>
+        </div>
+      )}
+
       <div className="mt-4 pt-4 border-t border-gray-700">
         <div className="bg-gray-800 rounded-lg p-4">
-          {isEditing ? (
-            <textarea
-              value={editData.reasonForChoice}
-              onChange={(e) => handleEditChange('reasonForChoice', e.target.value)}
-              className="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 text-gray-400 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
-              rows={2}
-              placeholder="Razão da escolha..."
-            />
-          ) : (
-            <p className="text-gray-400">{formatValue(displayData.reasonForChoice, 'Razão da escolha não informada')}</p>
-          )}
+          <h4 className="text-white font-medium mb-2">Razão da Escolha</h4>
+          <p className="text-gray-400">{formatValue(startup.reasonForChoice, 'Razão da escolha não informada')}</p>
         </div>
       </div>
     </div>
   );
 };
 
-const StartupDetailCard = ({ 
-  startup, 
-  onStartupUpdated 
-}: { 
-  startup: StartupType;
-  onStartupUpdated: (updatedStartup: StartupType) => void;
-}) => {
-  const { t } = useTranslation();
-  const [savedStartup, setSavedStartup] = useState<SavedStartupType | null>(null);
-  const [pipelineStages, setPipelineStages] = useState<PipelineStage[]>(DEFAULT_STAGES);
-  const [isSaving, setIsSaving] = useState(false);
-  const [isEditing, setIsEditing] = useState(false);
-  const [editData, setEditData] = useState<StartupType>(startup);
+const StartupDetailCard = ({ startup, onBack }: { startup: StartupType; onBack: () => void }) => {
   const [isExportingPDF, setIsExportingPDF] = useState(false);
-
-  useEffect(() => {
-    const checkIfSaved = async () => {
-      if (!auth.currentUser) return;
-      
-      try {
-        const q = query(
-          collection(db, 'selectedStartups'),
-          where('userId', '==', auth.currentUser.uid),
-          where('startupName', '==', startup.name)
-        );
-        const querySnapshot = await getDocs(q);
-        if (!querySnapshot.empty) {
-          const savedData = { id: querySnapshot.docs[0].id, ...querySnapshot.docs[0].data() } as SavedStartupType;
-          setSavedStartup(savedData);
-        }
-      } catch (error) {
-        console.error('Error checking if startup is saved:', error);
-      }
-    };
-
-    checkIfSaved();
-  }, [startup.name]);
-
-  useEffect(() => {
-    const loadStages = async () => {
-      if (!auth.currentUser) return;
-
-      try {
-        const stagesDoc = await getDocs(query(collection(db, 'pipelineStages'), where('userId', '==', auth.currentUser.uid)));
-        if (!stagesDoc.empty) {
-          const userStages = stagesDoc.docs[0].data().stages as PipelineStage[];
-          const sortedStages = userStages.sort((a, b) => a.order - b.order);
-          setPipelineStages(sortedStages);
-        }
-      } catch (error) {
-        console.error('Error loading stages:', error);
-      }
-    };
-
-    loadStages();
-  }, []);
-
-  const handleSaveEdit = async () => {
-    try {
-      onStartupUpdated(editData);
-      setIsEditing(false);
-    } catch (error) {
-      console.error('Error updating startup:', error);
-    }
-  };
-
-  const handleEditChange = (field: string, value: any) => {
-    if (field.includes('.')) {
-      const [parent, child] = field.split('.');
-      setEditData(prev => ({
-        ...prev,
-        [parent]: {
-          ...(prev as any)[parent],
-          [child]: value
-        }
-      }));
-    } else {
-      setEditData(prev => ({
-        ...prev,
-        [field]: value
-      }));
-    }
-  };
-
-  const handleFounderChange = (index: number, field: string, value: string) => {
-    const updatedFounders = [...(editData.fundadores || [])];
-    if (!updatedFounders[index]) {
-      updatedFounders[index] = { nome: '', formacao: '', experiencia: '', perfil: '' };
-    }
-    updatedFounders[index] = {
-      ...updatedFounders[index],
-      [field]: value
-    };
-    setEditData(prev => ({
-      ...prev,
-      fundadores: updatedFounders
-    }));
-  };
-
-  const addFounder = () => {
-    setEditData(prev => ({
-      ...prev,
-      fundadores: [
-        ...(prev.fundadores || []),
-        { nome: '', formacao: '', experiencia: '', perfil: '' }
-      ]
-    }));
-  };
-
-  const removeFounder = (index: number) => {
-    setEditData(prev => ({
-      ...prev,
-      fundadores: (prev.fundadores || []).filter((_, i) => i !== index)
-    }));
-  };
-
-  const handleSelectStartup = async () => {
-    if (!auth.currentUser || isSaving) return;
-
-    setIsSaving(true);
-
-    try {
-      if (savedStartup) {
-        await deleteDoc(doc(db, 'selectedStartups', savedStartup.id));
-        setSavedStartup(null);
-      } else {
-        const docRef = await addDoc(collection(db, 'selectedStartups'), {
-          userId: auth.currentUser.uid,
-          userEmail: auth.currentUser.email,
-          challengeId: 'detail-view',
-          challengeTitle: 'Visualização Individual',
-          startupName: startup.name,
-          startupData: startup,
-          selectedAt: new Date().toISOString(),
-          stage: 'mapeada',
-          updatedAt: new Date().toISOString()
-        });
-        
-        const newSavedStartup = {
-          id: docRef.id,
-          userId: auth.currentUser.uid,
-          userEmail: auth.currentUser.email || '',
-          challengeId: 'detail-view',
-          challengeTitle: 'Visualização Individual',
-          startupName: startup.name,
-          startupData: startup,
-          selectedAt: new Date().toISOString(),
-          stage: 'mapeada',
-          updatedAt: new Date().toISOString()
-        };
-        
-        setSavedStartup(newSavedStartup);
-      }
-    } catch (error) {
-      console.error('Error saving/removing startup:', error);
-    } finally {
-      setIsSaving(false);
-    }
-  };
 
   const exportToPDF = async () => {
     setIsExportingPDF(true);
@@ -805,676 +495,410 @@ const StartupDetailCard = ({
     }
   };
 
-  const getCurrentStage = () => {
-    if (!savedStartup) return null;
-    return pipelineStages.find(stage => stage.id === savedStartup.stage);
-  };
-
-  const currentStage = getCurrentStage();
-  const displayData = isEditing ? editData : startup;
-  
   return (
-    <div className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-xl p-6">
-      {/* Header with actions */}
-      <div className="flex justify-between items-start mb-6">
-        <div className="space-y-3">
-          <div className="flex items-center gap-3">
-            {isEditing ? (
-              <input
-                type="text"
-                value={editData.name}
-                onChange={(e) => handleEditChange('name', e.target.value)}
-                className="text-2xl font-bold bg-gray-700 border border-gray-600 rounded px-2 py-1 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
+    <div className="min-h-screen bg-black p-4 lg:p-8">
+      <div className="max-w-4xl mx-auto">
+        <div className="flex items-center justify-between mb-8">
+          <button
+            onClick={onBack}
+            className="flex items-center text-gray-400 hover:text-white"
+          >
+            <ArrowLeft size={20} className="mr-2" />
+            Voltar para lista
+          </button>
+          <button
+            onClick={exportToPDF}
+            disabled={isExportingPDF}
+            className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 text-white rounded-lg transition-colors"
+          >
+            {isExportingPDF ? (
+              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
             ) : (
-              <h2 className="text-2xl font-bold text-white">{displayData.name}</h2>
+              <Download size={16} />
             )}
-            <div className="flex items-center gap-2">
-              <span className="bg-blue-600 text-white text-sm px-3 py-1 rounded-full font-bold">
-                #{displayData.sequentialNumber || 'N/A'}
-              </span>
-              {displayData.websiteValidated && (
-                <CheckCircle size={16} className="text-green-400" title="Website validado" />
-              )}
-            </div>
-          </div>
-          {currentStage && (
-            <div className="flex items-center gap-2">
-              <span className={`px-2 py-1 rounded-full text-xs font-medium border ${currentStage.color}`}>
-                {currentStage.name}
-              </span>
-            </div>
-          )}
-          <SocialLinks startup={displayData} />
-        </div>
-        <div className="flex flex-col items-end gap-2">
-          <div className="flex gap-2">
-            <button
-              onClick={() => setIsEditing(!isEditing)}
-              className="flex items-center gap-2 px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors text-sm"
-            >
-              {isEditing ? <X size={16} /> : <Edit size={16} />}
-              {isEditing ? 'Cancelar' : 'Editar'}
-            </button>
-            <button
-              onClick={exportToPDF}
-              disabled={isExportingPDF}
-              className="flex items-center gap-2 px-3 py-1 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 text-white rounded-lg transition-colors text-sm"
-            >
-              {isExportingPDF ? (
-                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-              ) : (
-                <Download size={16} />
-              )}
-              {isExportingPDF ? 'Gerando...' : 'Salvar PDF'}
-            </button>
-            <button
-              onClick={handleSelectStartup}
-              disabled={isSaving}
-              className={`flex items-center gap-2 px-3 py-1 rounded-lg text-sm font-medium transition-all ${
-                savedStartup
-                  ? 'bg-red-600 hover:bg-red-700 text-white'
-                  : isSaving
-                  ? 'bg-gray-600 text-gray-300 cursor-not-allowed'
-                  : 'bg-purple-600 hover:bg-purple-700 text-white'
-              }`}
-            >
-              {savedStartup ? (
-                <>
-                  <X size={16} />
-                  {t.removeFromPipeline || 'Remover'}
-                </>
-              ) : isSaving ? (
-                <>
-                  <div className="w-4 h-4 border-2 border-gray-300 border-t-transparent rounded-full animate-spin" />
-                  {t.saving}
-                </>
-              ) : (
-                <>
-                  <Plus size={16} />
-                  {t.selectStartup}
-                </>
-              )}
-            </button>
-          </div>
-          <StarRating rating={displayData.rating} />
-          {isEditing && (
-            <select
-              value={editData.rating}
-              onChange={(e) => handleEditChange('rating', parseInt(e.target.value))}
-              className="bg-gray-700 border border-gray-600 rounded px-2 py-1 text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              {[1, 2, 3, 4, 5].map(num => (
-                <option key={num} value={num}>{num}</option>
-              ))}
-            </select>
-          )}
-        </div>
-      </div>
-
-      {/* PDF Export Content */}
-      <div id="startup-detail-content" className="space-y-6">
-        {/* Description */}
-        <div>
-          <h3 className="text-lg font-bold text-white mb-3">Descrição</h3>
-          {isEditing ? (
-            <textarea
-              value={editData.description}
-              onChange={(e) => handleEditChange('description', e.target.value)}
-              className="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 text-gray-400 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
-              rows={3}
-            />
-          ) : (
-            <p className="text-gray-400">{formatValue(displayData.description)}</p>
-          )}
+            {isExportingPDF ? 'Gerando...' : 'Salvar PDF'}
+          </button>
         </div>
 
-        {/* Basic Information Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="space-y-4">
-            <h4 className="text-md font-bold text-white">Informações Básicas</h4>
-            <div className="space-y-3">
-              <div className="flex items-center gap-2 text-gray-300">
-                <Calendar className="text-blue-400" size={16} />
-                <span className="text-gray-400">Fundação:</span>
-                {isEditing ? (
-                  <input
-                    type="text"
-                    value={editData.foundedYear}
-                    onChange={(e) => handleEditChange('foundedYear', e.target.value)}
-                    className="bg-gray-700 border border-gray-600 rounded px-2 py-1 text-white text-sm w-20 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                ) : (
-                  formatValue(displayData.foundedYear)
-                )}
-              </div>
-              <div className="flex items-center gap-2 text-gray-300">
-                <Building2 className="text-purple-400" size={16} />
-                <span className="text-gray-400">Categoria:</span>
-                {isEditing ? (
-                  <input
-                    type="text"
-                    value={editData.category}
-                    onChange={(e) => handleEditChange('category', e.target.value)}
-                    className="bg-gray-700 border border-gray-600 rounded px-2 py-1 text-white text-sm flex-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                ) : (
-                  formatValue(displayData.category)
-                )}
-              </div>
-              <div className="flex items-center gap-2 text-gray-300">
-                <Box className="text-pink-400" size={16} />
-                <span className="text-gray-400">Vertical:</span>
-                {isEditing ? (
-                  <input
-                    type="text"
-                    value={editData.vertical}
-                    onChange={(e) => handleEditChange('vertical', e.target.value)}
-                    className="bg-gray-700 border border-gray-600 rounded px-2 py-1 text-white text-sm flex-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                ) : (
-                  formatValue(displayData.vertical)
-                )}
-              </div>
-              <div className="flex items-center gap-2 text-gray-300">
-                <MapPin className="text-emerald-400" size={16} />
-                <span className="text-gray-400">Localização:</span>
-                {isEditing ? (
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      value={editData.city}
-                      onChange={(e) => handleEditChange('city', e.target.value)}
-                      placeholder="Cidade"
-                      className="bg-gray-700 border border-gray-600 rounded px-2 py-1 text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                    <input
-                      type="text"
-                      value={editData.state}
-                      onChange={(e) => handleEditChange('state', e.target.value)}
-                      placeholder="Estado"
-                      className="bg-gray-700 border border-gray-600 rounded px-2 py-1 text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                    <input
-                      type="text"
-                      value={editData.country}
-                      onChange={(e) => handleEditChange('country', e.target.value)}
-                      placeholder="País"
-                      className="bg-gray-700 border border-gray-600 rounded px-2 py-1 text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
+        {/* PDF Export Content */}
+        <div id="startup-detail-content" className="bg-white text-black p-8 rounded-lg">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            {/* Main Info */}
+            <div className="lg:col-span-2 space-y-8">
+              {/* Header */}
+              <div className="border-b border-gray-300 pb-6">
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <h1 className="text-3xl font-bold text-black">{startup.name}</h1>
+                    <div className="flex items-center gap-3 mt-2">
+                      {startup.sequentialNumber && (
+                        <span className="bg-blue-600 text-white text-sm px-3 py-1 rounded-full font-bold">
+                          #{startup.sequentialNumber}
+                        </span>
+                      )}
+                      {startup.websiteValidated && (
+                        <CheckCircle size={16} className="text-green-600" />
+                      )}
+                    </div>
                   </div>
-                ) : (
-                  <span>
-                    {formatValue(displayData.city)}
-                    {displayData.state && displayData.state !== 'NÃO DIVULGADO' && `, ${displayData.state}`}
-                    {displayData.country && displayData.country !== 'NÃO DIVULGADO' && `, ${displayData.country}`}
-                  </span>
-                )}
+                  <div className="text-right">
+                    <div className="flex items-center gap-1 mb-2">
+                      {[1, 2, 3, 4, 5].map((star) => (
+                        <Star
+                          key={star}
+                          size={24}
+                          className={`${
+                            star <= startup.rating
+                              ? 'text-yellow-500 fill-yellow-500'
+                              : 'text-gray-300'
+                          }`}
+                        />
+                      ))}
+                    </div>
+                    <div className="text-2xl font-bold text-black">{startup.rating}/5</div>
+                    <div className="text-sm text-gray-600">Match Score</div>
+                  </div>
+                </div>
               </div>
-            </div>
-          </div>
 
-          <div className="space-y-4">
-            <h4 className="text-md font-bold text-white">Dados Operacionais</h4>
-            <div className="space-y-3">
-              <div className="flex items-center gap-2 text-gray-300">
-                <Users className="text-blue-400" size={16} />
-                <span className="text-gray-400">Tamanho da Equipe:</span>
-                {isEditing ? (
-                  <input
-                    type="text"
-                    value={editData.teamSize}
-                    onChange={(e) => handleEditChange('teamSize', e.target.value)}
-                    className="bg-gray-700 border border-gray-600 rounded px-2 py-1 text-white text-sm flex-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                ) : (
-                  formatValue(displayData.teamSize)
-                )}
+              {/* Description */}
+              <div>
+                <h3 className="text-xl font-bold text-black mb-4">Descrição</h3>
+                <p className="text-gray-700 leading-relaxed">{formatValue(startup.description)}</p>
               </div>
-              <div className="flex items-center gap-2 text-gray-300">
-                <Users className="text-green-400" size={16} />
-                <span className="text-gray-400">Funcionários:</span>
-                {isEditing ? (
-                  <input
-                    type="text"
-                    value={editData.employees}
-                    onChange={(e) => handleEditChange('employees', e.target.value)}
-                    className="bg-gray-700 border border-gray-600 rounded px-2 py-1 text-white text-sm flex-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                ) : (
-                  formatValue(displayData.employees)
-                )}
-              </div>
-              <div className="flex items-center gap-2 text-gray-300">
-                <Briefcase className="text-purple-400" size={16} />
-                <span className="text-gray-400">Modelo de Negócio:</span>
-                {isEditing ? (
-                  <input
-                    type="text"
-                    value={editData.businessModel}
-                    onChange={(e) => handleEditChange('businessModel', e.target.value)}
-                    className="bg-gray-700 border border-gray-600 rounded px-2 py-1 text-white text-sm flex-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                ) : (
-                  formatValue(displayData.businessModel)
-                )}
-              </div>
-              <div className="flex items-center gap-2 text-gray-300">
-                <Globe className="text-pink-400" size={16} />
-                <span className="text-gray-400">Status IPO:</span>
-                {isEditing ? (
-                  <select
-                    value={editData.ipoStatus}
-                    onChange={(e) => handleEditChange('ipoStatus', e.target.value)}
-                    className="bg-gray-700 border border-gray-600 rounded px-2 py-1 text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="private">Private</option>
-                    <option value="public">Public</option>
-                    <option value="acquired">Acquired</option>
-                    <option value="NÃO DIVULGADO">Não Divulgado</option>
-                  </select>
-                ) : (
-                  formatValue(displayData.ipoStatus)
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
 
-        {/* Contact Information */}
-        <div>
-          <h4 className="text-md font-bold text-white mb-3">Informações de Contato</h4>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-3">
-              <div className="flex items-center gap-2 text-gray-300">
-                <Mail className="text-blue-400" size={16} />
-                <span className="text-gray-400">Email:</span>
-                {isEditing ? (
-                  <input
-                    type="email"
-                    value={editData.email}
-                    onChange={(e) => handleEditChange('email', e.target.value)}
-                    className="bg-gray-700 border border-gray-600 rounded px-2 py-1 text-white text-sm flex-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                ) : (
-                  <a href={`mailto:${displayData.email}`} className="text-blue-400 hover:text-blue-300">
-                    {formatValue(displayData.email)}
-                  </a>
-                )}
-              </div>
-              <div className="flex items-center gap-2 text-gray-300">
-                <Phone className="text-green-400" size={16} />
-                <span className="text-gray-400">Telefone:</span>
-                {isEditing ? (
-                  <input
-                    type="tel"
-                    value={editData.telefone}
-                    onChange={(e) => handleEditChange('telefone', e.target.value)}
-                    className="bg-gray-700 border border-gray-600 rounded px-2 py-1 text-white text-sm flex-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                ) : (
-                  formatValue(displayData.telefone)
-                )}
-              </div>
-            </div>
-            <div className="space-y-3">
-              <div className="flex items-center gap-2 text-gray-300">
-                <Phone className="text-green-400" size={16} />
-                <span className="text-gray-400">Celular:</span>
-                {isEditing ? (
-                  <input
-                    type="tel"
-                    value={editData.celular}
-                    onChange={(e) => handleEditChange('celular', e.target.value)}
-                    className="bg-gray-700 border border-gray-600 rounded px-2 py-1 text-white text-sm flex-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                ) : (
-                  formatValue(displayData.celular)
-                )}
-              </div>
-              <div className="flex items-center gap-2 text-gray-300">
-                <Linkedin className="text-blue-500" size={16} />
-                <span className="text-gray-400">LinkedIn:</span>
-                {isEditing ? (
-                  <input
-                    type="url"
-                    value={editData.linkedin}
-                    onChange={(e) => handleEditChange('linkedin', e.target.value)}
-                    className="bg-gray-700 border border-gray-600 rounded px-2 py-1 text-white text-sm flex-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                ) : displayData.linkedin && displayData.linkedin !== 'NÃO DIVULGADO' ? (
-                  <a href={displayData.linkedin} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300">
-                    LinkedIn
-                  </a>
-                ) : (
-                  <span>Não informado</span>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Solution Details */}
-        {displayData.solution && (
-          <div>
-            <h4 className="text-md font-bold text-white mb-3">Detalhes da Solução</h4>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-3">
-                <div className="flex items-center gap-2 text-gray-300">
-                  <Building2 className="text-blue-400" size={16} />
-                  <span className="text-gray-400">Sede:</span>
-                  {isEditing ? (
-                    <input
-                      type="text"
-                      value={editData.solution?.sede}
-                      onChange={(e) => handleEditChange('solution.sede', e.target.value)}
-                      className="bg-gray-700 border border-gray-600 rounded px-2 py-1 text-white text-sm flex-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                  ) : (
-                    formatValue(displayData.solution.sede)
-                  )}
+              {/* Problem Solution */}
+              {startup.problemaSolve && startup.problemaSolve !== 'NÃO DIVULGADO' && (
+                <div>
+                  <h3 className="text-xl font-bold text-black mb-4">Problema que Resolve</h3>
+                  <p className="text-gray-700 leading-relaxed">{startup.problemaSolve}</p>
                 </div>
-                <div className="flex items-center gap-2 text-gray-300">
-                  <TrendingUp className="text-purple-400" size={16} />
-                  <span className="text-gray-400">Porte:</span>
-                  {isEditing ? (
-                    <select
-                      value={editData.solution?.porte}
-                      onChange={(e) => handleEditChange('solution.porte', e.target.value)}
-                      className="bg-gray-700 border border-gray-600 rounded px-2 py-1 text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    >
-                      <option value="Pequeno">Pequeno</option>
-                      <option value="Médio">Médio</option>
-                      <option value="Grande">Grande</option>
-                      <option value="NÃO DIVULGADO">Não Divulgado</option>
-                    </select>
-                  ) : (
-                    formatValue(displayData.solution.porte)
-                  )}
-                </div>
-                <div className="flex items-center gap-2 text-gray-300">
-                  <DollarSign className="text-green-400" size={16} />
-                  <span className="text-gray-400">Recebeu Aporte:</span>
-                  {isEditing ? (
-                    <select
-                      value={editData.solution?.recebeuAporte}
-                      onChange={(e) => handleEditChange('solution.recebeuAporte', e.target.value)}
-                      className="bg-gray-700 border border-gray-600 rounded px-2 py-1 text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    >
-                      <option value="Sim">Sim</option>
-                      <option value="Não">Não</option>
-                      <option value="NÃO DIVULGADO">Não Divulgado</option>
-                    </select>
-                  ) : (
-                    formatValue(displayData.solution.recebeuAporte)
-                  )}
-                </div>
-              </div>
-              <div className="space-y-3">
-                <div className="flex items-center gap-2 text-gray-300">
-                  <Rocket className="text-orange-400" size={16} />
-                  <span className="text-gray-400">Estágio:</span>
-                  {isEditing ? (
-                    <input
-                      type="text"
-                      value={editData.solution?.stage}
-                      onChange={(e) => handleEditChange('solution.stage', e.target.value)}
-                      className="bg-gray-700 border border-gray-600 rounded px-2 py-1 text-white text-sm flex-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                  ) : (
-                    formatValue(displayData.solution.stage)
-                  )}
-                </div>
-                <div className="flex items-center gap-2 text-gray-300">
-                  <DollarSign className="text-yellow-400" size={16} />
-                  <span className="text-gray-400">Valuation:</span>
-                  {isEditing ? (
-                    <input
-                      type="text"
-                      value={editData.solution?.valuation}
-                      onChange={(e) => handleEditChange('solution.valuation', e.target.value)}
-                      className="bg-gray-700 border border-gray-600 rounded px-2 py-1 text-white text-sm flex-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                  ) : (
-                    formatValue(displayData.solution.valuation)
-                  )}
-                </div>
-                <div className="flex items-center gap-2 text-gray-300">
-                  <TrendingUp className="text-indigo-400" size={16} />
-                  <span className="text-gray-400">Investimentos:</span>
-                  {isEditing ? (
-                    <input
-                      type="text"
-                      value={editData.solution?.investimentos}
-                      onChange={(e) => handleEditChange('solution.investimentos', e.target.value)}
-                      className="bg-gray-700 border border-gray-600 rounded px-2 py-1 text-white text-sm flex-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                  ) : (
-                    formatValue(displayData.solution.investimentos)
-                  )}
-                </div>
-              </div>
-            </div>
-            
-            {/* Principais Clientes */}
-            <div className="mt-4">
-              <div className="flex items-start gap-2 text-gray-300">
-                <Building2 className="text-cyan-400 mt-1" size={16} />
-                <span className="text-gray-400">Principais Clientes:</span>
-              </div>
-              {isEditing ? (
-                <textarea
-                  value={editData.solution?.principaisClientes}
-                  onChange={(e) => handleEditChange('solution.principaisClientes', e.target.value)}
-                  className="w-full mt-2 bg-gray-700 border border-gray-600 rounded px-3 py-2 text-white text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  rows={2}
-                />
-              ) : (
-                <p className="text-gray-300 mt-2">{formatValue(displayData.solution.principaisClientes)}</p>
               )}
-            </div>
-          </div>
-        )}
 
-        {/* Problem Solution */}
-        <div>
-          <h4 className="text-md font-bold text-white mb-3">Problema que Resolve</h4>
-          {isEditing ? (
-            <textarea
-              value={editData.problemaSolve}
-              onChange={(e) => handleEditChange('problemaSolve', e.target.value)}
-              className="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 text-gray-400 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
-              rows={3}
-            />
-          ) : (
-            <p className="text-gray-400">{formatValue(displayData.problemaSolve)}</p>
-          )}
-        </div>
+              {/* Basic Information */}
+              <div>
+                <h3 className="text-xl font-bold text-black mb-4">Informações Básicas</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-600 mb-1">Categoria</label>
+                      <p className="text-black">{formatValue(startup.category)}</p>
+                    </div>
 
-        {/* Founders */}
-        {displayData.fundadores && displayData.fundadores.length > 0 && (
-          <div>
-            <div className="flex items-center justify-between mb-3">
-              <h4 className="text-md font-bold text-white">Fundadores</h4>
-              {isEditing && (
-                <button
-                  onClick={addFounder}
-                  className="flex items-center gap-2 px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors text-sm"
-                >
-                  <Plus size={16} />
-                  Adicionar
-                </button>
-              )}
-            </div>
-            <div className="space-y-4">
-              {displayData.fundadores.map((founder, index) => (
-                <div key={index} className="bg-gray-700 rounded-lg p-4">
-                  <div className="flex items-center justify-between mb-3">
-                    <h5 className="text-white font-medium">Fundador {index + 1}</h5>
-                    {isEditing && displayData.fundadores && displayData.fundadores.length > 1 && (
-                      <button
-                        onClick={() => removeFounder(index)}
-                        className="text-red-400 hover:text-red-300 p-1 rounded"
-                      >
-                        <X size={16} />
-                      </button>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-600 mb-1">Vertical</label>
+                      <p className="text-black">{formatValue(startup.vertical)}</p>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-600 mb-1">Ano de Fundação</label>
+                      <p className="text-black">{formatValue(startup.foundedYear)}</p>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-600 mb-1">Modelo de Negócio</label>
+                      <p className="text-black">{formatValue(startup.businessModel)}</p>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-600 mb-1">Estágio</label>
+                      <p className="text-black">{formatValue(startup.stage)}</p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-600 mb-1">Localização</label>
+                      <p className="text-black">
+                        {formatValue(startup.city)}
+                        {startup.state && startup.state !== 'NÃO DIVULGADO' && `, ${startup.state}`}
+                        {startup.country && startup.country !== 'NÃO DIVULGADO' && `, ${startup.country}`}
+                      </p>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-600 mb-1">Tamanho da Equipe</label>
+                      <p className="text-black">{formatValue(startup.teamSize)}</p>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-600 mb-1">Funcionários</label>
+                      <p className="text-black">{formatValue(startup.employees)}</p>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-600 mb-1">Status IPO</label>
+                      <p className="text-black">{formatValue(startup.ipoStatus)}</p>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-600 mb-1">Completude dos Dados</label>
+                      <p className="text-black">{startup.dataCompleteness || 50}%</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Technologies and Tags */}
+              <div>
+                <h3 className="text-xl font-bold text-black mb-4">Tecnologias e Tags</h3>
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-600 mb-2">Tecnologias</label>
+                    <p className="text-black">{formatValue(startup.technologies)}</p>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-600 mb-2">Tags</label>
+                    {startup.tags && startup.tags !== 'NÃO DIVULGADO' ? (
+                      <div className="flex flex-wrap gap-2">
+                        {startup.tags.split(',').map((tag, index) => (
+                          <span key={index} className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm border border-blue-200">
+                            {tag.trim()}
+                          </span>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-gray-600">Nenhuma tag informada</p>
                     )}
                   </div>
+
+                  {startup.keyStrengths && startup.keyStrengths.length > 0 && startup.keyStrengths[0] !== 'NÃO DIVULGADO' && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-600 mb-2">Principais Forças</label>
+                      <div className="space-y-1">
+                        {startup.keyStrengths.map((strength, index) => (
+                          <div key={index} className="flex items-center gap-2">
+                            <div className="w-2 h-2 bg-blue-600 rounded-full" />
+                            <span className="text-black">{strength}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Solution Details */}
+              {startup.solution && (
+                <div>
+                  <h3 className="text-xl font-bold text-black mb-4">Detalhes da Solução</h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                      <span className="text-gray-400 text-sm">Nome:</span>
-                      {isEditing ? (
-                        <input
-                          type="text"
-                          value={founder.nome}
-                          onChange={(e) => handleFounderChange(index, 'nome', e.target.value)}
-                          className="w-full mt-1 bg-gray-600 border border-gray-500 rounded px-2 py-1 text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        />
-                      ) : (
-                        <p className="text-white">{formatValue(founder.nome)}</p>
-                      )}
+                      <label className="block text-sm font-medium text-gray-600 mb-1">Porte</label>
+                      <p className="text-black">{formatValue(startup.solution.porte)}</p>
                     </div>
+
                     <div>
-                      <span className="text-gray-400 text-sm">Formação:</span>
-                      {isEditing ? (
-                        <input
-                          type="text"
-                          value={founder.formacao}
-                          onChange={(e) => handleFounderChange(index, 'formacao', e.target.value)}
-                          className="w-full mt-1 bg-gray-600 border border-gray-500 rounded px-2 py-1 text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        />
-                      ) : (
-                        <p className="text-white">{formatValue(founder.formacao)}</p>
-                      )}
+                      <label className="block text-sm font-medium text-gray-600 mb-1">Investimentos</label>
+                      <p className="text-black">{formatValue(startup.solution.investimentos)}</p>
                     </div>
+
                     <div>
-                      <span className="text-gray-400 text-sm">Experiência:</span>
-                      {isEditing ? (
-                        <input
-                          type="text"
-                          value={founder.experiencia}
-                          onChange={(e) => handleFounderChange(index, 'experiencia', e.target.value)}
-                          className="w-full mt-1 bg-gray-600 border border-gray-500 rounded px-2 py-1 text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        />
-                      ) : (
-                        <p className="text-white">{formatValue(founder.experiencia)}</p>
-                      )}
+                      <label className="block text-sm font-medium text-gray-600 mb-1">Recebeu Aporte</label>
+                      <p className="text-black">{formatValue(startup.solution.recebeuAporte)}</p>
                     </div>
+
                     <div>
-                      <span className="text-gray-400 text-sm">Perfil:</span>
-                      {isEditing ? (
-                        <input
-                          type="text"
-                          value={founder.perfil}
-                          onChange={(e) => handleFounderChange(index, 'perfil', e.target.value)}
-                          className="w-full mt-1 bg-gray-600 border border-gray-500 rounded px-2 py-1 text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        />
-                      ) : (
-                        <p className="text-white">{formatValue(founder.perfil)}</p>
-                      )}
+                      <label className="block text-sm font-medium text-gray-600 mb-1">Valuation</label>
+                      <p className="text-black">{formatValue(startup.solution.valuation)}</p>
+                    </div>
+
+                    <div className="md:col-span-2">
+                      <label className="block text-sm font-medium text-gray-600 mb-1">Principais Clientes</label>
+                      <p className="text-black">{formatValue(startup.solution.principaisClientes)}</p>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-600 mb-1">Número de Colaboradores</label>
+                      <p className="text-black">{formatValue(startup.solution.numeroColaboradores)}</p>
                     </div>
                   </div>
                 </div>
-              ))}
-            </div>
-          </div>
-        )}
+              )}
 
-        {/* Technologies and Tags */}
-        <div>
-          <h4 className="text-md font-bold text-white mb-3">Tecnologias e Tags</h4>
-          <div className="space-y-3">
-            <div>
-              <span className="text-gray-400 text-sm">Tecnologias:</span>
-              {isEditing ? (
-                <input
-                  type="text"
-                  value={editData.technologies}
-                  onChange={(e) => handleEditChange('technologies', e.target.value)}
-                  className="w-full mt-1 bg-gray-700 border border-gray-600 rounded px-2 py-1 text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              ) : (
-                <p className="text-white">{formatValue(displayData.technologies)}</p>
+              {/* Founders */}
+              {startup.fundadores && startup.fundadores.length > 0 && (
+                <div>
+                  <h3 className="text-xl font-bold text-black mb-4">Fundadores</h3>
+                  <div className="space-y-4">
+                    {startup.fundadores.map((founder, index) => (
+                      <div key={index} className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                        <h4 className="text-black font-medium mb-3">Fundador {index + 1}</h4>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div>
+                            <label className="block text-sm font-medium text-gray-600 mb-1">Nome</label>
+                            <p className="text-black">{formatValue(founder.nome)}</p>
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-600 mb-1">Formação</label>
+                            <p className="text-black">{formatValue(founder.formacao)}</p>
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-600 mb-1">Experiência</label>
+                            <p className="text-black">{formatValue(founder.experiencia)}</p>
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-600 mb-1">Perfil</label>
+                            <p className="text-black">{formatValue(founder.perfil)}</p>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Partners */}
+              {startup.parceiros && startup.parceiros.length > 0 && (
+                <div>
+                  <h3 className="text-xl font-bold text-black mb-4">Parceiros</h3>
+                  <div className="space-y-2">
+                    {startup.parceiros.map((partner, index) => (
+                      <div key={index} className="bg-gray-50 rounded-lg p-3 border border-gray-200">
+                        <p className="text-black">{typeof partner === 'string' ? partner : JSON.stringify(partner)}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Opportunities */}
+              {startup.oportunidades && startup.oportunidades.length > 0 && (
+                <div>
+                  <h3 className="text-xl font-bold text-black mb-4">Oportunidades</h3>
+                  <div className="space-y-2">
+                    {startup.oportunidades.map((opportunity, index) => (
+                      <div key={index} className="bg-gray-50 rounded-lg p-3 border border-gray-200">
+                        <p className="text-black">{typeof opportunity === 'string' ? opportunity : JSON.stringify(opportunity)}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               )}
             </div>
-            <div>
-              <span className="text-gray-400 text-sm">Tags:</span>
-              {isEditing ? (
-                <input
-                  type="text"
-                  value={editData.tags}
-                  onChange={(e) => handleEditChange('tags', e.target.value)}
-                  placeholder="Separar por vírgulas"
-                  className="w-full mt-1 bg-gray-700 border border-gray-600 rounded px-2 py-1 text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              ) : (
-                <div className="flex flex-wrap gap-2 mt-1">
-                  {displayData.tags && displayData.tags !== 'NÃO DIVULGADO' ? (
-                    displayData.tags.split(',').map((tag, index) => (
-                      <span key={index} className="bg-blue-900/50 text-blue-200 px-2 py-1 rounded-full text-xs">
-                        {tag.trim()}
-                      </span>
-                    ))
-                  ) : (
-                    <span className="text-gray-400 text-sm">Nenhuma tag informada</span>
+
+            {/* Sidebar */}
+            <div className="space-y-6">
+              {/* Contact Information */}
+              <div className="bg-gray-50 rounded-lg p-6 border border-gray-200">
+                <h3 className="text-xl font-bold text-black mb-4">Contato</h3>
+                <div className="space-y-4">
+                  <div className="flex items-center gap-3">
+                    <Mail className="text-blue-600" size={20} />
+                    <a href={`mailto:${startup.email}`} className="text-blue-600 hover:text-blue-700">
+                      {formatValue(startup.email)}
+                    </a>
+                  </div>
+
+                  <div className="flex items-center gap-3">
+                    <Phone className="text-green-600" size={20} />
+                    <span className="text-black">
+                      {formatValue(startup.telefone)}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-3">
+                    <Phone className="text-green-600" size={20} />
+                    <span className="text-gray-600 text-sm">Celular:</span>
+                    <span className="text-black">
+                      {formatValue(startup.celular)}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-3">
+                    <Globe className="text-purple-600" size={20} />
+                    <a href={startup.website} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-700">
+                      Website {startup.websiteValidated && <CheckCircle size={14} className="inline ml-1 text-green-600" />}
+                    </a>
+                  </div>
+
+                  {startup.linkedin && startup.linkedin !== 'NÃO DIVULGADO' && (
+                    <div className="flex items-center gap-3">
+                      <Linkedin className="text-blue-700" size={20} />
+                      <a href={startup.linkedin} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-700">
+                        LinkedIn
+                      </a>
+                    </div>
                   )}
+
+                  {startup.founderLinkedIn && startup.founderLinkedIn !== 'NÃO DIVULGADO' && (
+                    <div className="flex items-center gap-3">
+                      <Linkedin className="text-blue-700" size={20} />
+                      <span className="text-gray-600 text-sm">Fundador:</span>
+                      <a href={startup.founderLinkedIn} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-700">
+                        LinkedIn do Fundador
+                      </a>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Key Metrics */}
+              <div className="bg-gray-50 rounded-lg p-6 border border-gray-200">
+                <h3 className="text-xl font-bold text-black mb-4">Métricas</h3>
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <span className="text-gray-600">Rating</span>
+                    <div className="flex items-center gap-1">
+                      <span className="text-black font-bold">{startup.rating}</span>
+                      <Star size={16} className="text-yellow-500 fill-yellow-500" />
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <span className="text-gray-600">Completude dos Dados</span>
+                    <span className="text-black font-bold">{startup.dataCompleteness || 50}%</span>
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <span className="text-gray-600">Website Validado</span>
+                    <span className={`font-bold ${startup.websiteValidated ? 'text-green-600' : 'text-red-600'}`}>
+                      {startup.websiteValidated ? 'Sim' : 'Não'}
+                    </span>
+                  </div>
+
+                  {startup.sequentialNumber && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-gray-600">Número Sequencial</span>
+                      <span className="text-black font-bold">#{startup.sequentialNumber}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Legal Information */}
+              <div className="bg-gray-50 rounded-lg p-6 border border-gray-200">
+                <h3 className="text-xl font-bold text-black mb-4">Informações Legais</h3>
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-600 mb-1">Razão Social</label>
+                    <p className="text-black">{formatValue(startup.legalName)}</p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-600 mb-1">Fundador Principal</label>
+                    <p className="text-black">{formatValue(startup.founder)}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Technologies */}
+              {startup.technologies && startup.technologies !== 'NÃO DIVULGADO' && (
+                <div className="bg-gray-50 rounded-lg p-6 border border-gray-200">
+                  <h3 className="text-xl font-bold text-black mb-4">Tecnologias</h3>
+                  <p className="text-black">{startup.technologies}</p>
                 </div>
               )}
             </div>
           </div>
-        </div>
 
-        {/* Data Completeness */}
-        <div>
-          <h4 className="text-md font-bold text-white mb-3">Qualidade dos Dados</h4>
-          <div className="flex items-center gap-3">
-            <div className="flex-1 bg-gray-700 rounded-full h-3">
-              <div 
-                className="bg-blue-500 h-3 rounded-full transition-all duration-300"
-                style={{ width: `${displayData.dataCompleteness || 50}%` }}
-              />
+          {/* Reason for Choice */}
+          <div className="mt-8 pt-6 border-t border-gray-300">
+            <h3 className="text-xl font-bold text-black mb-4">Razão da Escolha</h3>
+            <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+              <p className="text-gray-700">{formatValue(startup.reasonForChoice, 'Razão da escolha não informada')}</p>
             </div>
-            <span className="text-white font-medium">{displayData.dataCompleteness || 50}%</span>
           </div>
-        </div>
-      </div>
-      
-      {isEditing && (
-        <div className="mt-6 pt-4 border-t border-gray-700 flex gap-2">
-          <button
-            onClick={handleSaveEdit}
-            className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors"
-          >
-            <Save size={16} />
-            Salvar Alterações
-          </button>
-          <button
-            onClick={() => {
-              setIsEditing(false);
-              setEditData(startup);
-            }}
-            className="flex items-center gap-2 px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg transition-colors"
-          >
-            <X size={16} />
-            Cancelar
-          </button>
-        </div>
-      )}
-      
-      <div className="mt-4 pt-4 border-t border-gray-700">
-        <div className="bg-gray-800 rounded-lg p-4">
-          <h5 className="text-white font-medium mb-2">Razão da Escolha</h5>
-          {isEditing ? (
-            <textarea
-              value={editData.reasonForChoice}
-              onChange={(e) => handleEditChange('reasonForChoice', e.target.value)}
-              className="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 text-gray-400 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
-              rows={2}
-              placeholder="Razão da escolha..."
-            />
-          ) : (
-            <p className="text-gray-400">{formatValue(displayData.reasonForChoice, 'Razão da escolha não informada')}</p>
-          )}
         </div>
       </div>
     </div>
@@ -1484,62 +908,53 @@ const StartupDetailCard = ({
 const StartupList = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const [startupData, setStartupData] = useState<StartupListType | null>(null);
+  const [startupLists, setStartupLists] = useState<StartupListType[]>([]);
+  const [savedStartups, setSavedStartups] = useState<SavedStartupType[]>([]);
   const [selectedStartup, setSelectedStartup] = useState<StartupType | null>(null);
-  const [refreshKey, setRefreshKey] = useState(0);
-  const [editableStartups, setEditableStartups] = useState<StartupType[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [isExportingPDF, setIsExportingPDF] = useState(false);
 
   useEffect(() => {
-    const fetchStartupData = async () => {
+    const fetchData = async () => {
+      if (!auth.currentUser) {
+        navigate('/login');
+        return;
+      }
+
       try {
+        // Fetch startup lists
         const q = query(
           collection(db, 'startupLists'),
-          orderBy('createdAt', 'desc'),
-          limit(1)
+          where('userId', '==', auth.currentUser.uid)
         );
         const querySnapshot = await getDocs(q);
-        if (!querySnapshot.empty) {
-          const doc = querySnapshot.docs[0];
-          const data = { id: doc.id, ...doc.data() } as StartupListType;
-          setStartupData(data);
-          setEditableStartups(data.startups || []);
-        }
+        const lists = querySnapshot.docs.map(
+          doc => ({ id: doc.id, ...doc.data() } as StartupListType)
+        );
+        
+        // Sort by creation date (most recent first)
+        lists.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+        setStartupLists(lists);
+
+        // Fetch saved startups
+        const savedQuery = query(
+          collection(db, 'selectedStartups'),
+          where('userId', '==', auth.currentUser.uid)
+        );
+        const savedSnapshot = await getDocs(savedQuery);
+        const saved = savedSnapshot.docs.map(
+          doc => ({ id: doc.id, ...doc.data() } as SavedStartupType)
+        );
+        setSavedStartups(saved);
       } catch (error) {
-        console.error('Error fetching startup data:', error);
+        console.error('Error fetching startup lists:', error);
+      } finally {
+        setLoading(false);
       }
     };
 
-    fetchStartupData();
-  }, []);
-
-  const handleStartupUpdated = (updatedStartup: StartupType) => {
-    setEditableStartups(prev => 
-      prev.map(startup => 
-        startup.name === updatedStartup.name ? updatedStartup : startup
-      )
-    );
-    
-    if (selectedStartup && selectedStartup.name === updatedStartup.name) {
-      setSelectedStartup(updatedStartup);
-    }
-
-    // Update in database
-    if (startupData) {
-      const updatedStartupList = {
-        ...startupData,
-        startups: editableStartups.map(startup => 
-          startup.name === updatedStartup.name ? updatedStartup : startup
-        )
-      };
-      
-      updateDoc(doc(db, 'startupLists', startupData.id), {
-        startups: updatedStartupList.startups,
-        updatedAt: new Date().toISOString()
-      }).catch(error => {
-        console.error('Error updating startup list:', error);
-      });
-    }
-  };
+    fetchData();
+  }, [navigate]);
 
   const handleStartupClick = (startup: StartupType) => {
     setSelectedStartup(startup);
@@ -1549,49 +964,100 @@ const StartupList = () => {
     if (selectedStartup) {
       setSelectedStartup(null);
     } else {
-      navigate(-1);
+      navigate('/');
     }
   };
 
-  const handleStartupSaved = () => {
-    setRefreshKey(prev => prev + 1);
+  const toggleSaveStartup = async (startup: StartupType) => {
+    if (!auth.currentUser) return;
+
+    const existingSaved = savedStartups.find(
+      saved => saved.startupName === startup.name
+    );
+
+    if (existingSaved) {
+      // Remove from saved
+      try {
+        await deleteDoc(doc(db, 'selectedStartups', existingSaved.id));
+        setSavedStartups(prev => prev.filter(saved => saved.id !== existingSaved.id));
+      } catch (error) {
+        console.error('Error removing startup:', error);
+      }
+    } else {
+      // Add to saved
+      try {
+        const currentList = startupLists[0]; // Get the most recent list
+        if (!currentList) return;
+
+        const savedData = {
+          userId: auth.currentUser.uid,
+          userEmail: auth.currentUser.email,
+          challengeId: currentList.challengeId,
+          challengeTitle: currentList.challengeTitle,
+          startupName: startup.name,
+          startupData: startup,
+          selectedAt: new Date().toISOString(),
+          stage: 'mapeada',
+          updatedAt: new Date().toISOString()
+        };
+
+        const docRef = await addDoc(collection(db, 'selectedStartups'), savedData);
+        setSavedStartups(prev => [...prev, { id: docRef.id, ...savedData }]);
+      } catch (error) {
+        console.error('Error saving startup:', error);
+      }
+    }
   };
 
-  if (!startupData) {
+  const isStartupSaved = (startupName: string) => {
+    return savedStartups.some(saved => saved.startupName === startupName);
+  };
+
+  const exportAllToPDF = async () => {
+    setIsExportingPDF(true);
+    
+    try {
+      const element = document.getElementById('startup-list-content');
+      if (!element) {
+        console.error('Element not found for PDF export');
+        return;
+      }
+
+      const opt = {
+        margin: 1,
+        filename: `startup_list_${format(new Date(), 'yyyy-MM-dd')}.pdf`,
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { scale: 2, useCORS: true },
+        jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
+      };
+
+      await html2pdf().set(opt).from(element).save();
+    } catch (error) {
+      console.error('Error exporting PDF:', error);
+    } finally {
+      setIsExportingPDF(false);
+    }
+  };
+
+  if (loading) {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center">
-        <div className="text-white">{t.loadingStartups}</div>
+        <div className="text-white">Carregando startups...</div>
       </div>
     );
   }
 
-  const formattedDate = startupData.createdAt 
-    ? format(new Date(startupData.createdAt), "dd/MM/yyyy", { locale: ptBR })
-    : '';
-
+  // Show startup detail card
   if (selectedStartup) {
-    return (
-      <div className="min-h-screen bg-black p-8">
-        <div className="max-w-6xl mx-auto">
-          <button
-            onClick={handleBack}
-            className="flex items-center text-gray-400 hover:text-white mb-8"
-          >
-            <ArrowLeft size={20} className="mr-2" />
-            {t.backToList}
-          </button>
-
-          <StartupDetailCard 
-            startup={selectedStartup} 
-            onStartupUpdated={handleStartupUpdated}
-          />
-        </div>
-      </div>
-    );
+    return <StartupDetailCard startup={selectedStartup} onBack={handleBack} />;
   }
+
+  // Get all startups from all lists
+  const allStartups = startupLists.flatMap(list => list.startups || []);
 
   return (
     <div className="min-h-screen bg-black">
+      {/* Header */}
       <div className="flex flex-col p-3 border-b border-border">
         <div className="flex items-center justify-between">
           <button
@@ -1601,48 +1067,128 @@ const StartupList = () => {
             <ArrowLeft size={20} />
           </button>
           <div className="flex items-center gap-2 flex-1 ml-4">
-            <FolderOpen size={20} className="text-gray-400" />
-            <h2 className="text-lg font-medium">{startupData.challengeTitle}</h2>
+            <Rocket size={20} className="text-gray-400" />
+            <h2 className="text-lg font-medium">{t.startupList}</h2>
           </div>
           <div className="flex items-center gap-4">
-            <span className="text-sm text-gray-400">{formattedDate}</span>
-            <Link
-              to="/saved-startups"
-              className="flex items-center gap-2 px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors text-sm"
-            >
-              <BarChart3 size={16} />
-              Pipeline CRM
-            </Link>
+            <span className="text-sm text-gray-400">
+              {allStartups.length} startup{allStartups.length !== 1 ? 's' : ''}
+            </span>
+            {allStartups.length > 0 && (
+              <button
+                onClick={exportAllToPDF}
+                disabled={isExportingPDF}
+                className="flex items-center gap-2 px-3 py-1 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 text-white rounded-lg transition-colors text-sm"
+              >
+                {isExportingPDF ? (
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <Download size={16} />
+                )}
+                {isExportingPDF ? 'Gerando...' : 'Salvar PDF'}
+              </button>
+            )}
           </div>
         </div>
       </div>
 
-      <div className="p-8">
+      <div className="p-4 lg:p-8">
         <div className="max-w-7xl mx-auto">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-16" key={`${refreshKey}-${editableStartups.length}`}>
-            {editableStartups.map((startup, index) => (
-              <StartupCard
-                key={index}
-                startup={startup}
-                onClick={() => handleStartupClick(startup)}
-                challengeTitle={startupData.challengeTitle}
-                challengeId={startupData.id}
-                onStartupSaved={handleStartupSaved}
-                onStartupUpdated={handleStartupUpdated}
-              />
-            ))}
-          </div>
+          {startupLists.length === 0 ? (
+            <div className="text-center py-16">
+              <Rocket size={64} className="text-gray-600 mx-auto mb-4" />
+              <h3 className="text-xl font-bold text-white mb-2">Nenhuma lista de startups</h3>
+              <p className="text-gray-400 mb-6">
+                Você ainda não gerou nenhuma lista de startups. Crie um desafio para começar.
+              </p>
+              <button
+                onClick={() => navigate('/new-challenge')}
+                className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-medium transition-colors"
+              >
+                Criar Desafio
+              </button>
+            </div>
+          ) : (
+            <div id="startup-list-content">
+              {startupLists.map((list, listIndex) => (
+                <div key={list.id} className="mb-12">
+                  {/* List Header */}
+                  <div className="mb-8">
+                    <div className="flex items-center justify-between mb-4">
+                      <h2 className="text-2xl font-bold text-white">{list.challengeTitle}</h2>
+                      <span className="text-sm text-gray-400">
+                        {format(new Date(list.createdAt), "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}
+                      </span>
+                    </div>
+                    
+                    {list.ratingExplanation && (
+                      <p className="text-gray-300 mb-4">{list.ratingExplanation}</p>
+                    )}
 
-          <div className="space-y-16">
-            <section>
-              <h2 className="text-2xl font-bold text-white mb-8">{t.proofOfConcept}</h2>
-              <ProjectTimeline planning={startupData.projectPlanning} />
-            </section>
+                    {/* Project Planning */}
+                    {list.projectPlanning && list.projectPlanning.length > 0 && (
+                      <div className="bg-gray-800 rounded-lg p-6 mb-6">
+                        <h3 className="text-lg font-bold text-white mb-4">Planejamento do Projeto</h3>
+                        <div className="space-y-4">
+                          {list.projectPlanning.map((phase, index) => (
+                            <div key={index} className="border-l-4 border-blue-500 pl-4">
+                              <h4 className="font-medium text-white">{phase.phase}</h4>
+                              <p className="text-sm text-gray-400 mb-1">Duração: {phase.duration}</p>
+                              <p className="text-gray-300">{phase.description}</p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
 
-            <section>
-              <ResultsSection data={startupData} />
-            </section>
-          </div>
+                    {/* Expected Results and Competitive Advantages */}
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+                      {list.expectedResults && list.expectedResults.length > 0 && (
+                        <div className="bg-gray-800 rounded-lg p-6">
+                          <h3 className="text-lg font-bold text-white mb-4">Resultados Esperados</h3>
+                          <ul className="space-y-2">
+                            {list.expectedResults.map((result, index) => (
+                              <li key={index} className="flex items-start gap-2">
+                                <Target size={16} className="text-green-400 mt-1 flex-shrink-0" />
+                                <span className="text-gray-300">{result}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+
+                      {list.competitiveAdvantages && list.competitiveAdvantages.length > 0 && (
+                        <div className="bg-gray-800 rounded-lg p-6">
+                          <h3 className="text-lg font-bold text-white mb-4">Vantagens Competitivas</h3>
+                          <ul className="space-y-2">
+                            {list.competitiveAdvantages.map((advantage, index) => (
+                              <li key={index} className="flex items-start gap-2">
+                                <Award size={16} className="text-yellow-400 mt-1 flex-shrink-0" />
+                                <span className="text-gray-300">{advantage}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Startups Grid */}
+                  <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+                    {(list.startups || []).map((startup) => (
+                      <StartupCard
+                        key={`${listIndex}-${startup.sequentialNumber || startup.name}`}
+                        startup={startup}
+                        isSaved={isStartupSaved(startup.name)}
+                        onToggleSave={toggleSaveStartup}
+                        onClick={() => handleStartupClick(startup)}
+                      />
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </div>
