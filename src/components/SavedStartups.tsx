@@ -762,7 +762,7 @@ const SavedStartups = () => {
                 startups={savedStartups}
                 stages={pipelineStages}
                 onStageChange={handleStageChange}
-                onStartupClick={() => {}} // Remove click functionality
+                onStartupClick={(startupId) => navigate(`/startup/${startupId}/detail`)}
                 onRemoveStartup={handleRemoveStartup}
                 onDeleteStage={handleDeleteStage}
               />

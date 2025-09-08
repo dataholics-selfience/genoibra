@@ -76,9 +76,8 @@ const Login = () => {
         throw new Error('No user data available');
       }
 
-
       setError('');
-      navigate('/', { replace: true });
+      navigate('/verify-email', { replace: true });
       
     } catch (error: any) {
       console.error('Login error:', error);
