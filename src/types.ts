@@ -84,6 +84,44 @@ export interface StartupType {
   ipoStatus: string;
   city: string;
   reasonForChoice: string;
+  sequentialNumber?: number;
+  websiteValidated?: boolean;
+  state?: string;
+  country?: string;
+  telefone?: string;
+  celular?: string;
+  linkedin?: string;
+  founderLinkedIn?: string;
+  founder?: string;
+  stage?: string;
+  legalName?: string;
+  employees?: string;
+  technologies?: string;
+  tags?: string;
+  dataCompleteness?: number;
+  keyStrengths?: string[];
+  solution?: {
+    nome?: string;
+    site?: string;
+    sede?: string;
+    fundadores?: string;
+    porte?: string;
+    investimentos?: string;
+    recebeuAporte?: string;
+    stage?: string;
+    valuation?: string;
+    principaisClientes?: string;
+    numeroColaboradores?: string;
+  };
+  problemaSolve?: string;
+  fundadores?: Array<{
+    nome: string;
+    formacao: string;
+    experiencia: string;
+    perfil: string;
+  }>;
+  parceiros?: any[];
+  oportunidades?: any[];
   socialLinks?: {
     linkedin?: string;
     facebook?: string;

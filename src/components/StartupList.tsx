@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
-  Star, Calendar, Building2, MapPin, Users, Briefcase, Award, 
+  Star, Calendar, Building2, MapPin, Users, Briefcase, Award, Edit, Save, X,
   Target, Rocket, ArrowLeft, Mail, Globe, Box, Linkedin,
   Facebook, Twitter, Instagram, FolderOpen, Plus, Check, X, BarChart3
 } from 'lucide-react';
@@ -183,18 +183,22 @@ const StartupCard = ({
   onClick, 
   challengeTitle, 
   challengeId,
-  onStartupSaved 
+  onStartupSaved,
+  onStartupUpdated
 }: { 
   startup: StartupType; 
   onClick: () => void;
   challengeTitle: string;
   challengeId: string;
   onStartupSaved: () => void;
+  onStartupUpdated: (updatedStartup: StartupType) => void;
 }) => {
   const { t } = useTranslation();
   const [isSaving, setIsSaving] = useState(false);
   const [savedStartup, setSavedStartup] = useState<SavedStartupType | null>(null);
   const [pipelineStages, setPipelineStages] = useState<PipelineStage[]>(DEFAULT_STAGES);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editData, setEditData] = useState<StartupType>(startup);
 
   useEffect(() => {
     const checkIfSaved = async () => {
@@ -237,6 +241,23 @@ const StartupCard = ({
 
     loadStages();
   }, []);
+
+  const handleSaveEdit = async () => {
+    try {
+      // Update the startup data in the parent component
+      onStartupUpdated(editData);
+      setIsEditing(false);
+    } catch (error) {
+      console.error('Error updating startup:', error);
+    }
+  };
+
+  const handleEditChange = (field: string, value: any) => {
+    setEditData(prev => ({
+      ...prev,
+      [field]: value
+    }));
+  };
 
   const handleSelectStartup = async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -296,14 +317,31 @@ const StartupCard = ({
   const currentStage = getCurrentStage();
 
   return (
-    <div
-      onClick={onClick}
-      className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-xl p-6 hover:scale-105 transition-transform cursor-pointer"
-    >
+    <div className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-xl p-6 hover:scale-105 transition-transform">
       <div className="flex justify-between items-start mb-4">
         <div className="space-y-3 flex-1">
           <div className="flex items-center gap-3">
-            <h2 className="text-xl font-bold text-white">{startup.name}</h2>
+            {isEditing ? (
+              <input
+                type="text"
+                value={editData.name}
+                onChange={(e) => handleEditChange('name', e.target.value)}
+                className="text-xl font-bold bg-gray-700 border border-gray-600 rounded px-2 py-1 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            ) : (
+              <h2 
+                className="text-xl font-bold text-white cursor-pointer hover:text-blue-300"
+                onClick={onClick}
+              >
+                {startup.name}
+              </h2>
+            )}
+            <button
+              onClick={() => setIsEditing(!isEditing)}
+              className="text-gray-400 hover:text-white p-1 rounded"
+            >
+              {isEditing ? <X size={16} /> : <Edit size={16} />}
+            </button>
             <button
               onClick={handleSelectStartup}
               disabled={isSaving}
@@ -342,57 +380,191 @@ const StartupCard = ({
           )}
           <SocialLinks startup={startup} />
         </div>
-        <StarRating rating={startup.rating} />
+        <div className="flex flex-col items-end gap-2">
+          <StarRating rating={isEditing ? editData.rating : startup.rating} />
+          {isEditing && (
+            <select
+              value={editData.rating}
+              onChange={(e) => handleEditChange('rating', parseInt(e.target.value))}
+              className="bg-gray-700 border border-gray-600 rounded px-2 py-1 text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              {[1, 2, 3, 4, 5].map(num => (
+                <option key={num} value={num}>{num}</option>
+              ))}
+            </select>
+          )}
+        </div>
       </div>
-      <p className="text-gray-400 mb-6">{startup.description}</p>
+      
+      {isEditing ? (
+        <textarea
+          value={editData.description}
+          onChange={(e) => handleEditChange('description', e.target.value)}
+          className="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 text-gray-300 mb-6 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+          rows={3}
+        />
+      ) : (
+        <p className="text-gray-400 mb-6 cursor-pointer hover:text-gray-300" onClick={onClick}>
+          {startup.description}
+        </p>
+      )}
+      
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-3">
           <div className="flex items-center gap-2 text-gray-300">
             <Calendar className="text-blue-400" size={16} />
-            {startup.foundedYear}
+            {isEditing ? (
+              <input
+                type="text"
+                value={editData.foundedYear}
+                onChange={(e) => handleEditChange('foundedYear', e.target.value)}
+                className="bg-gray-700 border border-gray-600 rounded px-2 py-1 text-white text-sm w-20 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            ) : (
+              startup.foundedYear
+            )}
           </div>
           <div className="flex items-center gap-2 text-gray-300">
             <Building2 className="text-purple-400" size={16} />
-            {startup.category}
+            {isEditing ? (
+              <input
+                type="text"
+                value={editData.category}
+                onChange={(e) => handleEditChange('category', e.target.value)}
+                className="bg-gray-700 border border-gray-600 rounded px-2 py-1 text-white text-sm flex-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            ) : (
+              startup.category
+            )}
           </div>
           <div className="flex items-center gap-2 text-gray-300">
             <Box className="text-pink-400" size={16} />
-            {startup.vertical}
+            {isEditing ? (
+              <input
+                type="text"
+                value={editData.vertical}
+                onChange={(e) => handleEditChange('vertical', e.target.value)}
+                className="bg-gray-700 border border-gray-600 rounded px-2 py-1 text-white text-sm flex-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            ) : (
+              startup.vertical
+            )}
           </div>
           <div className="flex items-center gap-2 text-gray-300">
             <MapPin className="text-emerald-400" size={16} />
-            {startup.city}
+            {isEditing ? (
+              <input
+                type="text"
+                value={editData.city}
+                onChange={(e) => handleEditChange('city', e.target.value)}
+                className="bg-gray-700 border border-gray-600 rounded px-2 py-1 text-white text-sm flex-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            ) : (
+              startup.city
+            )}
           </div>
         </div>
         <div className="space-y-3">
           <div className="flex items-center gap-2 text-gray-300">
             <Users className="text-blue-400" size={16} />
-            {startup.teamSize}
+            {isEditing ? (
+              <input
+                type="text"
+                value={editData.teamSize}
+                onChange={(e) => handleEditChange('teamSize', e.target.value)}
+                className="bg-gray-700 border border-gray-600 rounded px-2 py-1 text-white text-sm flex-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            ) : (
+              startup.teamSize
+            )}
           </div>
           <div className="flex items-center gap-2 text-gray-300">
             <Briefcase className="text-purple-400" size={16} />
-            {startup.businessModel}
+            {isEditing ? (
+              <input
+                type="text"
+                value={editData.businessModel}
+                onChange={(e) => handleEditChange('businessModel', e.target.value)}
+                className="bg-gray-700 border border-gray-600 rounded px-2 py-1 text-white text-sm flex-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            ) : (
+              startup.businessModel
+            )}
           </div>
           <div className="flex items-center gap-2 text-gray-300">
             <Globe className="text-pink-400" size={16} />
-            {startup.ipoStatus}
+            {isEditing ? (
+              <select
+                value={editData.ipoStatus}
+                onChange={(e) => handleEditChange('ipoStatus', e.target.value)}
+                className="bg-gray-700 border border-gray-600 rounded px-2 py-1 text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="private">Private</option>
+                <option value="public">Public</option>
+                <option value="acquired">Acquired</option>
+                <option value="NÃO DIVULGADO">Não Divulgado</option>
+              </select>
+            ) : (
+              startup.ipoStatus
+            )}
           </div>
         </div>
       </div>
+      
+      {isEditing && (
+        <div className="mt-4 pt-4 border-t border-gray-700 flex gap-2">
+          <button
+            onClick={handleSaveEdit}
+            className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors"
+          >
+            <Save size={16} />
+            Salvar
+          </button>
+          <button
+            onClick={() => {
+              setIsEditing(false);
+              setEditData(startup);
+            }}
+            className="flex items-center gap-2 px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg transition-colors"
+          >
+            <X size={16} />
+            Cancelar
+          </button>
+        </div>
+      )}
+      
       <div className="mt-4 pt-4 border-t border-gray-700">
         <div className="bg-gray-800 rounded-lg p-4">
-          <p className="text-gray-400">{startup.reasonForChoice}</p>
+          {isEditing ? (
+            <textarea
+              value={editData.reasonForChoice}
+              onChange={(e) => handleEditChange('reasonForChoice', e.target.value)}
+              className="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 text-gray-400 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+              rows={2}
+              placeholder="Razão da escolha..."
+            />
+          ) : (
+            <p className="text-gray-400">{startup.reasonForChoice}</p>
+          )}
         </div>
       </div>
     </div>
   );
 };
 
-const StartupDetailCard = ({ startup }: { startup: StartupType }) => {
+const StartupDetailCard = ({ 
+  startup, 
+  onStartupUpdated 
+}: { 
+  startup: StartupType;
+  onStartupUpdated: (updatedStartup: StartupType) => void;
+}) => {
   const { t } = useTranslation();
   const [savedStartup, setSavedStartup] = useState<SavedStartupType | null>(null);
   const [pipelineStages, setPipelineStages] = useState<PipelineStage[]>(DEFAULT_STAGES);
   const [isSaving, setIsSaving] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editData, setEditData] = useState<StartupType>(startup);
 
   useEffect(() => {
     const checkIfSaved = async () => {
@@ -435,6 +607,33 @@ const StartupDetailCard = ({ startup }: { startup: StartupType }) => {
 
     loadStages();
   }, []);
+
+  const handleSaveEdit = async () => {
+    try {
+      onStartupUpdated(editData);
+      setIsEditing(false);
+    } catch (error) {
+      console.error('Error updating startup:', error);
+    }
+  };
+
+  const handleEditChange = (field: string, value: any) => {
+    if (field.includes('.')) {
+      const [parent, child] = field.split('.');
+      setEditData(prev => ({
+        ...prev,
+        [parent]: {
+          ...(prev as any)[parent],
+          [child]: value
+        }
+      }));
+    } else {
+      setEditData(prev => ({
+        ...prev,
+        [field]: value
+      }));
+    }
+  };
 
   const handleSelectStartup = async () => {
     if (!auth.currentUser || isSaving) return;
@@ -488,13 +687,29 @@ const StartupDetailCard = ({ startup }: { startup: StartupType }) => {
   };
 
   const currentStage = getCurrentStage();
+  const displayData = isEditing ? editData : startup;
   
   return (
     <div className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-xl p-6">
       <div className="flex justify-between items-start mb-4">
         <div className="space-y-3">
           <div className="flex items-center gap-3">
-            <h2 className="text-xl font-bold text-white">{startup.name}</h2>
+            {isEditing ? (
+              <input
+                type="text"
+                value={editData.name}
+                onChange={(e) => handleEditChange('name', e.target.value)}
+                className="text-xl font-bold bg-gray-700 border border-gray-600 rounded px-2 py-1 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            ) : (
+              <h2 className="text-xl font-bold text-white">{displayData.name}</h2>
+            )}
+            <button
+              onClick={() => setIsEditing(!isEditing)}
+              className="text-gray-400 hover:text-white p-1 rounded"
+            >
+              {isEditing ? <X size={16} /> : <Edit size={16} />}
+            </button>
             <button
               onClick={handleSelectStartup}
               disabled={isSaving}
@@ -533,49 +748,173 @@ const StartupDetailCard = ({ startup }: { startup: StartupType }) => {
           )}
           <SocialLinks startup={startup} />
         </div>
-        <StarRating rating={startup.rating} />
+        <div className="flex flex-col items-end gap-2">
+          <StarRating rating={displayData.rating} />
+          {isEditing && (
+            <select
+              value={editData.rating}
+              onChange={(e) => handleEditChange('rating', parseInt(e.target.value))}
+              className="bg-gray-700 border border-gray-600 rounded px-2 py-1 text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              {[1, 2, 3, 4, 5].map(num => (
+                <option key={num} value={num}>{num}</option>
+              ))}
+            </select>
+          )}
+        </div>
       </div>
-      <p className="text-gray-400 mb-6">{startup.description}</p>
+      
+      {isEditing ? (
+        <textarea
+          value={editData.description}
+          onChange={(e) => handleEditChange('description', e.target.value)}
+          className="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 text-gray-400 mb-6 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+          rows={3}
+        />
+      ) : (
+        <p className="text-gray-400 mb-6">{displayData.description}</p>
+      )}
+      
       <div className="space-y-3">
         <div className="flex items-center gap-2 text-gray-300">
           <Calendar className="text-blue-400" size={16} />
           <span className="text-gray-400">{t.founded}:</span>
-          {startup.foundedYear}
+          {isEditing ? (
+            <input
+              type="text"
+              value={editData.foundedYear}
+              onChange={(e) => handleEditChange('foundedYear', e.target.value)}
+              className="bg-gray-700 border border-gray-600 rounded px-2 py-1 text-white text-sm w-20 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          ) : (
+            displayData.foundedYear
+          )}
         </div>
         <div className="flex items-center gap-2 text-gray-300">
           <Building2 className="text-purple-400" size={16} />
           <span className="text-gray-400">{t.category}:</span>
-          {startup.category}
+          {isEditing ? (
+            <input
+              type="text"
+              value={editData.category}
+              onChange={(e) => handleEditChange('category', e.target.value)}
+              className="bg-gray-700 border border-gray-600 rounded px-2 py-1 text-white text-sm flex-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          ) : (
+            displayData.category
+          )}
         </div>
         <div className="flex items-center gap-2 text-gray-300">
           <Box className="text-pink-400" size={16} />
           <span className="text-gray-400">{t.vertical}:</span>
-          {startup.vertical}
+          {isEditing ? (
+            <input
+              type="text"
+              value={editData.vertical}
+              onChange={(e) => handleEditChange('vertical', e.target.value)}
+              className="bg-gray-700 border border-gray-600 rounded px-2 py-1 text-white text-sm flex-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          ) : (
+            displayData.vertical
+          )}
         </div>
         <div className="flex items-center gap-2 text-gray-300">
           <MapPin className="text-emerald-400" size={16} />
           <span className="text-gray-400">{t.location}:</span>
-          {startup.city}
+          {isEditing ? (
+            <input
+              type="text"
+              value={editData.city}
+              onChange={(e) => handleEditChange('city', e.target.value)}
+              className="bg-gray-700 border border-gray-600 rounded px-2 py-1 text-white text-sm flex-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          ) : (
+            displayData.city
+          )}
         </div>
         <div className="flex items-center gap-2 text-gray-300">
           <Users className="text-blue-400" size={16} />
           <span className="text-gray-400">{t.teamSize}:</span>
-          {startup.teamSize}
+          {isEditing ? (
+            <input
+              type="text"
+              value={editData.teamSize}
+              onChange={(e) => handleEditChange('teamSize', e.target.value)}
+              className="bg-gray-700 border border-gray-600 rounded px-2 py-1 text-white text-sm flex-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          ) : (
+            displayData.teamSize
+          )}
         </div>
         <div className="flex items-center gap-2 text-gray-300">
           <Briefcase className="text-purple-400" size={16} />
           <span className="text-gray-400">{t.businessModel}:</span>
-          {startup.businessModel}
+          {isEditing ? (
+            <input
+              type="text"
+              value={editData.businessModel}
+              onChange={(e) => handleEditChange('businessModel', e.target.value)}
+              className="bg-gray-700 border border-gray-600 rounded px-2 py-1 text-white text-sm flex-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          ) : (
+            displayData.businessModel
+          )}
         </div>
         <div className="flex items-center gap-2 text-gray-300">
           <Globe className="text-pink-400" size={16} />
           <span className="text-gray-400">{t.ipoStatus}:</span>
-          {startup.ipoStatus}
+          {isEditing ? (
+            <select
+              value={editData.ipoStatus}
+              onChange={(e) => handleEditChange('ipoStatus', e.target.value)}
+              className="bg-gray-700 border border-gray-600 rounded px-2 py-1 text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="private">Private</option>
+              <option value="public">Public</option>
+              <option value="acquired">Acquired</option>
+              <option value="NÃO DIVULGADO">Não Divulgado</option>
+            </select>
+          ) : (
+            displayData.ipoStatus
+          )}
         </div>
       </div>
+      
+      {isEditing && (
+        <div className="mt-4 pt-4 border-t border-gray-700 flex gap-2">
+          <button
+            onClick={handleSaveEdit}
+            className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors"
+          >
+            <Save size={16} />
+            Salvar
+          </button>
+          <button
+            onClick={() => {
+              setIsEditing(false);
+              setEditData(startup);
+            }}
+            className="flex items-center gap-2 px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg transition-colors"
+          >
+            <X size={16} />
+            Cancelar
+          </button>
+        </div>
+      )}
+      
       <div className="mt-4 pt-4 border-t border-gray-700">
         <div className="bg-gray-800 rounded-lg p-4">
-          <p className="text-gray-400">{startup.reasonForChoice}</p>
+          {isEditing ? (
+            <textarea
+              value={editData.reasonForChoice}
+              onChange={(e) => handleEditChange('reasonForChoice', e.target.value)}
+              className="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 text-gray-400 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+              rows={2}
+              placeholder="Razão da escolha..."
+            />
+          ) : (
+            <p className="text-gray-400">{displayData.reasonForChoice}</p>
+          )}
         </div>
       </div>
     </div>
@@ -588,6 +927,7 @@ const StartupList = () => {
   const [startupData, setStartupData] = useState<StartupListType | null>(null);
   const [selectedStartup, setSelectedStartup] = useState<StartupType | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [editableStartups, setEditableStartups] = useState<StartupType[]>([]);
 
   useEffect(() => {
     const fetchStartupData = async () => {
@@ -600,7 +940,9 @@ const StartupList = () => {
         const querySnapshot = await getDocs(q);
         if (!querySnapshot.empty) {
           const doc = querySnapshot.docs[0];
-          setStartupData({ id: doc.id, ...doc.data() } as StartupListType);
+          const data = { id: doc.id, ...doc.data() } as StartupListType;
+          setStartupData(data);
+          setEditableStartups(data.startups || []);
         }
       } catch (error) {
         console.error('Error fetching startup data:', error);
@@ -610,6 +952,18 @@ const StartupList = () => {
     fetchStartupData();
   }, []);
 
+  const handleStartupUpdated = (updatedStartup: StartupType) => {
+    setEditableStartups(prev => 
+      prev.map(startup => 
+        startup.name === updatedStartup.name ? updatedStartup : startup
+      )
+    );
+    
+    // Also update the selected startup if it's the same one
+    if (selectedStartup && selectedStartup.name === updatedStartup.name) {
+      setSelectedStartup(updatedStartup);
+    }
+  };
   const handleStartupClick = (startup: StartupType) => {
     setSelectedStartup(startup);
   };
@@ -650,7 +1004,10 @@ const StartupList = () => {
             {t.backToList}
           </button>
 
-          <StartupDetailCard startup={selectedStartup} />
+          <StartupDetailCard 
+            startup={selectedStartup} 
+            onStartupUpdated={handleStartupUpdated}
+          />
         </div>
       </div>
     );
@@ -685,8 +1042,8 @@ const StartupList = () => {
 
       <div className="p-8">
         <div className="max-w-7xl mx-auto">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-16" key={refreshKey}>
-            {startupData.startups.map((startup, index) => (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-16" key={`${refreshKey}-${editableStartups.length}`}>
+            {editableStartups.map((startup, index) => (
               <StartupCard
                 key={index}
                 startup={startup}
@@ -694,6 +1051,7 @@ const StartupList = () => {
                 challengeTitle={startupData.challengeTitle}
                 challengeId={startupData.id}
                 onStartupSaved={handleStartupSaved}
+                onStartupUpdated={handleStartupUpdated}
               />
             ))}
           </div>

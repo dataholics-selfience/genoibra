@@ -222,22 +222,66 @@ const ChatInterface = ({ messages, addMessage, toggleSidebar, isSidebarOpen, web
 
   const extractStartupData = (content: string) => {
     try {
-      // Try to parse the content directly as JSON first
+      // First try to parse as direct JSON array
       try {
         const parsed = JSON.parse(content);
-        if (Array.isArray(parsed) && parsed.length > 0 && parsed[0].startups) {
-          return parsed[0];
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          // Check if it's the new format with startups array
+          if (parsed[0].startups && Array.isArray(parsed[0].startups)) {
+            console.log('✅ Detected new JSON format with startups array');
+            return parsed[0];
+          }
+          // Check if it's old format with direct startup objects
+          if (parsed[0].name && parsed[0].rating !== undefined) {
+            console.log('✅ Detected old JSON format, converting to new format');
+            return {
+              challengeTitle: 'Lista de Startups',
+              ratingExplanation: 'Startups recomendadas',
+              startups: parsed,
+              projectPlanning: [],
+              expectedResults: [],
+              competitiveAdvantages: []
+            };
+          }
         }
         return null;
-      } catch {
-        // If direct parsing fails, try the old format with XML tags
+      } catch (parseError) {
+        console.log('Direct JSON parsing failed, trying XML format...');
+        // Try the old XML format
         const startMatch = content.indexOf('<startup cards>');
         const endMatch = content.indexOf('</startup cards>');
         
-        if (startMatch === -1 || endMatch === -1) return null;
+        if (startMatch === -1 || endMatch === -1) {
+          console.log('No XML tags found, checking for JSON in content...');
+          
+          // Try to find JSON in the content
+          const jsonMatch = content.match(/\[[\s\S]*\]/);
+          if (jsonMatch) {
+            try {
+              const parsed = JSON.parse(jsonMatch[0]);
+              if (Array.isArray(parsed) && parsed.length > 0) {
+                console.log('✅ Found JSON in content, converting to new format');
+                return {
+                  challengeTitle: 'Lista de Startups',
+                  ratingExplanation: 'Startups recomendadas',
+                  startups: parsed,
+                  projectPlanning: [],
+                  expectedResults: [],
+                  competitiveAdvantages: []
+                };
+              }
+            } catch (error) {
+              console.error('Error parsing JSON found in content:', error);
+            }
+          }
+          
+          return null;
+        }
         
         const jsonStr = content.substring(startMatch + 15, endMatch).trim();
-        return JSON.parse(jsonStr);
+        const parsed = JSON.parse(jsonStr);
+        console.log('✅ Parsed XML format successfully');
+        return parsed;
       }
     } catch (error) {
       console.error('Error parsing startup data:', error);
