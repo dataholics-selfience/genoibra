@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { hasActiveLoginVerification } from '../utils/loginVerificationManager';
+import { needsLoginVerification } from '../utils/verificationStateManager';
 import { ArrowLeft, Loader2, Upload, X, Copy, Check, Globe, ExternalLink } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import { doc, getDoc, addDoc, collection, updateDoc } from 'firebase/firestore';
@@ -24,8 +24,8 @@ const NewChallenge = () => {
       }
 
       try {
-        const hasVerification = await hasActiveLoginVerification(auth.currentUser.uid);
-        if (!hasVerification) {
+        const needsVerification = await needsLoginVerification(auth.currentUser.uid);
+        if (needsVerification) {
           navigate('/verify-login', { replace: true });
           return;
         }

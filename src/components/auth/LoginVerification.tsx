@@ -97,21 +97,26 @@ const LoginVerification = () => {
     if (!auth.currentUser) return;
 
     try {
+      // First query by userId only to avoid composite index requirement
       const q = query(
         collection(db, 'loginVerifications'),
         where('userId', '==', auth.currentUser.uid),
-        where('status', '==', 'active'),
-        orderBy('createdAt', 'desc'),
-        limit(1)
+        limit(10) // Get more documents to filter client-side
       );
 
       const querySnapshot = await getDocs(q);
       
-      if (!querySnapshot.empty) {
-        const verification = {
-          id: querySnapshot.docs[0].id,
-          ...querySnapshot.docs[0].data()
-        } as LoginVerification;
+      // Filter for active status and sort by createdAt client-side
+      const activeVerifications = querySnapshot.docs
+        .map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        } as LoginVerification))
+        .filter(verification => verification.status === 'active')
+        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      
+      if (activeVerifications.length > 0) {
+        const verification = activeVerifications[0];
 
         // Check if verification is still valid
         const now = new Date();

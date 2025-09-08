@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { hasActiveLoginVerification } from '../utils/loginVerificationManager';
+import { needsLoginVerification } from '../utils/verificationStateManager';
 import { 
   Star, Calendar, Building2, MapPin, Users, Briefcase, Award, 
   Target, Rocket, ArrowLeft, Globe, Box, Linkedin,
@@ -560,8 +560,8 @@ const SavedStartups = () => {
       }
 
       try {
-        const hasVerification = await hasActiveLoginVerification(auth.currentUser.uid);
-        if (!hasVerification) {
+        const needsVerification = await needsLoginVerification(auth.currentUser.uid);
+        if (needsVerification) {
           navigate('/verify-login', { replace: true });
           return;
         }

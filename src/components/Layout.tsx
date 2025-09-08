@@ -6,7 +6,7 @@ import EnvironmentSelector from './EnvironmentSelector';
 import Sidebar from './Sidebar';
 import ChatInterface from './ChatInterface';
 import { MessageType, ChallengeType } from '../types';
-import { hasActiveLoginVerification } from '../utils/loginVerificationManager';
+import { needsLoginVerification } from '../utils/verificationStateManager';
 
 const welcomeMessages = [
   "Olá. Eu sou a Genie, sua agente de inovação aberta turbinada por IA! Crie agora um novo desafio e irei pesquisar em uma base de milhares de startups globais!",
@@ -34,8 +34,8 @@ const Layout = () => {
       }
 
       try {
-        const hasVerification = await hasActiveLoginVerification(auth.currentUser.uid);
-        if (!hasVerification) {
+        const needsVerification = await needsLoginVerification(auth.currentUser.uid);
+        if (needsVerification) {
           // User needs to verify login
           navigate('/verify-login', { replace: true });
           return;

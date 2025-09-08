@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { hasActiveLoginVerification } from '../../utils/loginVerificationManager';
+import { needsLoginVerification } from '../../utils/verificationStateManager';
 import { 
   ArrowLeft, Plus, Trash2, Shield, 
   CheckCircle, AlertTriangle, QrCode, Copy, Clock, Mail, Users
@@ -41,8 +41,8 @@ const SudoAdminInterface = () => {
       }
 
       try {
-        const hasVerification = await hasActiveLoginVerification(auth.currentUser.uid);
-        if (!hasVerification) {
+        const needsVerification = await needsLoginVerification(auth.currentUser.uid);
+        if (needsVerification) {
           navigate('/verify-login', { replace: true });
           return;
         }

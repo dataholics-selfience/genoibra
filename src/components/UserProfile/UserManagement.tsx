@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { hasActiveLoginVerification } from '../../utils/loginVerificationManager';
+import { needsLoginVerification } from '../../utils/verificationStateManager';
 import { 
   updateProfile, 
   sendPasswordResetEmail,
@@ -36,8 +36,8 @@ const UserManagement = () => {
       }
 
       try {
-        const hasVerification = await hasActiveLoginVerification(auth.currentUser.uid);
-        if (!hasVerification) {
+        const needsVerification = await needsLoginVerification(auth.currentUser.uid);
+        if (needsVerification) {
           navigate('/verify-login', { replace: true });
           return;
         }
