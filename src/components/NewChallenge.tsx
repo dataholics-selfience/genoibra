@@ -5,12 +5,14 @@ import { v4 as uuidv4 } from 'uuid';
 import { doc, getDoc, addDoc, collection, updateDoc } from 'firebase/firestore';
 import { auth, db } from '../firebase';
 import { useTranslation } from '../utils/i18n';
-import { API_CONFIG } from '../config/api';
+import { getWebhookUrl } from '../config/api';
+import EnvironmentSelector from './EnvironmentSelector';
 
 const STARTUP_LIST_TOKEN_COST = 30;
 
 const NewChallenge = () => {
   const { t } = useTranslation();
+  const [webhookEnvironment, setWebhookEnvironment] = useState<'production' | 'test'>('production');
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -22,6 +24,14 @@ const NewChallenge = () => {
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    // Load saved environment from localStorage
+    const savedEnvironment = localStorage.getItem('webhook-environment') as 'production' | 'test';
+    if (savedEnvironment) {
+      setWebhookEnvironment(savedEnvironment);
+    }
+  }, []);
 
   const checkAndUpdateTokens = async (cost: number): Promise<boolean> => {
     if (!auth.currentUser) return false;
@@ -129,11 +139,17 @@ const NewChallenge = () => {
         sessionId,
         message,
         challengeId: challengeRef.id
+        environment: webhookEnvironment
       });
 
-      const response = await fetch(API_CONFIG.webhook.url, {
+      const webhookUrl = getWebhookUrl(webhookEnvironment);
+      console.log(`🌐 Enviando desafio para webhook ${webhookEnvironment}:`, webhookUrl);
+      
+      const response = await fetch(webhookUrl, {
         method: 'POST',
-        headers: API_CONFIG.webhook.headers,
+        headers: {
+          'Content-Type': 'application/json'
+        },
         body: JSON.stringify({
           message,
           sessionId,
@@ -175,9 +191,13 @@ const NewChallenge = () => {
     }
   };
 
+  const handleEnvironmentChange = (environment: 'production' | 'test') => {
+    setWebhookEnvironment(environment);
+  };
 
   return (
     <div className="min-h-screen bg-black p-4">
+      <EnvironmentSelector onEnvironmentChange={handleEnvironmentChange} />
       <div className="max-w-2xl mx-auto">
         <div className="flex items-center justify-between mb-8">
           <button

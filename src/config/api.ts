@@ -1,6 +1,12 @@
+export const getWebhookUrl = (environment: 'production' | 'test' = 'production') => {
+  return environment === 'production' 
+    ? import.meta.env.VITE_WEBHOOK_URL || 'https://n8n.genoiapp.com/webhook/production'
+    : 'https://n8n.genoiapp.com/webhook-test/production';
+};
+
 export const API_CONFIG = {
   webhook: {
-    url: import.meta.env.VITE_WEBHOOK_URL || 'https://n8n.genoiapp.com/webhook/production',
+    url: getWebhookUrl(),
     headers: {
       'Content-Type': 'application/json'
     }

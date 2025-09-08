@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { collection, query, orderBy, onSnapshot, addDoc, where, getDocs } from 'firebase/firestore';
 import { db, auth } from '../firebase';
+import EnvironmentSelector from './EnvironmentSelector';
 import Sidebar from './Sidebar';
 import ChatInterface from './ChatInterface';
 import { MessageType, ChallengeType } from '../types';
@@ -15,6 +16,7 @@ const welcomeMessages = [
 
 const Layout = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [webhookEnvironment, setWebhookEnvironment] = useState<'production' | 'test'>('production');
   const [messages, setMessages] = useState<MessageType[]>([]);
   const [challenges, setChallenges] = useState<ChallengeType[]>([]);
   const [currentChallengeId, setCurrentChallengeId] = useState<string | null>(null);
@@ -114,6 +116,10 @@ const Layout = () => {
     setIsSidebarOpen(false);
   };
 
+  const handleEnvironmentChange = (environment: 'production' | 'test') => {
+    setWebhookEnvironment(environment);
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center">
@@ -124,6 +130,7 @@ const Layout = () => {
 
   return (
     <div className="flex h-screen bg-black text-gray-100">
+      <EnvironmentSelector onEnvironmentChange={handleEnvironmentChange} />
       <Sidebar 
         isOpen={isSidebarOpen} 
         toggleSidebar={toggleSidebar}
@@ -136,6 +143,7 @@ const Layout = () => {
         addMessage={addMessage} 
         toggleSidebar={toggleSidebar}
         isSidebarOpen={isSidebarOpen}
+        webhookEnvironment={webhookEnvironment}
         currentChallenge={challenges.find(c => c.id === currentChallengeId)}
       />
     </div>

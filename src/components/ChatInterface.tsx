@@ -3,7 +3,7 @@ import { Menu, SendHorizontal, Rocket, FolderOpen, Pencil, Mic, MicOff, BarChart
 import { useNavigate, Link } from 'react-router-dom';
 import { doc, getDoc, updateDoc, addDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { auth, db } from '../firebase';
-import { API_CONFIG } from '../config/api';
+import { getWebhookUrl } from '../config/api';
 import { MessageType, ChallengeType, TokenUsageType, StartupListType } from '../types';
 import { LoadingStates } from './LoadingStates';
 import { useTranslation } from '../utils/i18n';
@@ -13,6 +13,7 @@ interface ChatInterfaceProps {
   addMessage: (message: Omit<MessageType, 'id' | 'timestamp'>) => void;
   toggleSidebar: () => void;
   isSidebarOpen: boolean;
+  webhookEnvironment: 'production' | 'test';
   currentChallenge: ChallengeType | undefined;
 }
 
@@ -64,7 +65,7 @@ const ContactAdminModal = ({ isOpen, onClose }: { isOpen: boolean; onClose: () =
     </div>
   );
 };
-const ChatInterface = ({ messages, addMessage, toggleSidebar, isSidebarOpen, currentChallenge }: ChatInterfaceProps) => {
+const ChatInterface = ({ messages, addMessage, toggleSidebar, isSidebarOpen, webhookEnvironment, currentChallenge }: ChatInterfaceProps) => {
   const { t } = useTranslation();
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -318,9 +319,14 @@ const ChatInterface = ({ messages, addMessage, toggleSidebar, isSidebarOpen, cur
           scrollToBottom();
         }, 3000);
 
-        const response = await fetch(API_CONFIG.webhook.url, {
+        const webhookUrl = getWebhookUrl(webhookEnvironment);
+        console.log(`🌐 Enviando mensagem para webhook ${webhookEnvironment}:`, webhookUrl);
+        
+        const response = await fetch(webhookUrl, {
           method: 'POST',
-          headers: API_CONFIG.webhook.headers,
+          headers: {
+            'Content-Type': 'application/json'
+          },
           body: JSON.stringify({
             message: messageToSend,
             sessionId: currentChallenge.sessionId,
