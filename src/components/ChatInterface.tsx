@@ -229,76 +229,15 @@ const ChatInterface = ({ messages, addMessage, toggleSidebar, isSidebarOpen, web
           // Check if it's the new format with startups array
           if (parsed[0].startups && Array.isArray(parsed[0].startups)) {
             console.log('✅ Detected new JSON format with startups array');
-            // Process startups to ensure all fields are properly parsed
-            const processedData = {
-              ...parsed[0],
-              startups: parsed[0].startups.map((startup: any) => ({
-                ...startup,
-                // Ensure websiteValidated is boolean
-                websiteValidated: startup.websiteValidated === true || startup.websiteValidated === 'true',
-                // Ensure legalName is string
-                legalName: startup.legalName || 'NÃO DIVULGADO',
-                // Ensure founderLinkedIn is string
-                founderLinkedIn: startup.founderLinkedIn || 'NÃO DIVULGADO',
-                // Process keyStrengths array
-                keyStrengths: Array.isArray(startup.keyStrengths) ? startup.keyStrengths : ['NÃO DIVULGADO'],
-                // Process parceiros array - if empty, set to ['NÃO DIVULGADO']
-                parceiros: Array.isArray(startup.parceiros) && startup.parceiros.length > 0 
-                  ? startup.parceiros 
-                  : ['NÃO DIVULGADO'],
-                // Process oportunidades array - if empty, set to ['NÃO DIVULGADO']
-                oportunidades: Array.isArray(startup.oportunidades) && startup.oportunidades.length > 0 
-                  ? startup.oportunidades 
-                  : ['NÃO DIVULGADO'],
-                // Ensure solution object has numeroColaboradores
-                solution: startup.solution ? {
-                  ...startup.solution,
-                  numeroColaboradores: startup.solution.numeroColaboradores || 'NÃO DIVULGADO'
-                } : {
-                  numeroColaboradores: 'NÃO DIVULGADO',
-                  porte: 'NÃO DIVULGADO',
-                  investimentos: 'NÃO DIVULGADO'
-                }
-              }))
-            };
-            return processedData;
+            return parsed[0];
           }
           // Check if it's old format with direct startup objects
           if (parsed[0].name && parsed[0].rating !== undefined) {
             console.log('✅ Detected old JSON format, converting to new format');
-            const processedStartups = parsed.map((startup: any) => ({
-              ...startup,
-              // Ensure websiteValidated is boolean
-              websiteValidated: startup.websiteValidated === true || startup.websiteValidated === 'true',
-              // Ensure legalName is string
-              legalName: startup.legalName || 'NÃO DIVULGADO',
-              // Ensure founderLinkedIn is string
-              founderLinkedIn: startup.founderLinkedIn || 'NÃO DIVULGADO',
-              // Process keyStrengths array
-              keyStrengths: Array.isArray(startup.keyStrengths) ? startup.keyStrengths : ['NÃO DIVULGADO'],
-              // Process parceiros array - if empty, set to ['NÃO DIVULGADO']
-              parceiros: Array.isArray(startup.parceiros) && startup.parceiros.length > 0 
-                ? startup.parceiros 
-                : ['NÃO DIVULGADO'],
-              // Process oportunidades array - if empty, set to ['NÃO DIVULGADO']
-              oportunidades: Array.isArray(startup.oportunidades) && startup.oportunidades.length > 0 
-                ? startup.oportunidades 
-                : ['NÃO DIVULGADO'],
-              // Ensure solution object has numeroColaboradores
-              solution: startup.solution ? {
-                ...startup.solution,
-                numeroColaboradores: startup.solution.numeroColaboradores || 'NÃO DIVULGADO'
-              } : {
-                numeroColaboradores: 'NÃO DIVULGADO',
-                porte: 'NÃO DIVULGADO',
-                investimentos: 'NÃO DIVULGADO'
-              }
-            }));
-            
             return {
               challengeTitle: 'Lista de Startups',
               ratingExplanation: 'Startups recomendadas',
-              startups: processedStartups,
+              startups: parsed,
               projectPlanning: [],
               expectedResults: [],
               competitiveAdvantages: []
@@ -322,39 +261,10 @@ const ChatInterface = ({ messages, addMessage, toggleSidebar, isSidebarOpen, web
               const parsed = JSON.parse(jsonMatch[0]);
               if (Array.isArray(parsed) && parsed.length > 0) {
                 console.log('✅ Found JSON in content, converting to new format');
-                const processedStartups = parsed.map((startup: any) => ({
-                  ...startup,
-                  // Ensure websiteValidated is boolean
-                  websiteValidated: startup.websiteValidated === true || startup.websiteValidated === 'true',
-                  // Ensure legalName is string
-                  legalName: startup.legalName || 'NÃO DIVULGADO',
-                  // Ensure founderLinkedIn is string
-                  founderLinkedIn: startup.founderLinkedIn || 'NÃO DIVULGADO',
-                  // Process keyStrengths array
-                  keyStrengths: Array.isArray(startup.keyStrengths) ? startup.keyStrengths : ['NÃO DIVULGADO'],
-                  // Process parceiros array - if empty, set to ['NÃO DIVULGADO']
-                  parceiros: Array.isArray(startup.parceiros) && startup.parceiros.length > 0 
-                    ? startup.parceiros 
-                    : ['NÃO DIVULGADO'],
-                  // Process oportunidades array - if empty, set to ['NÃO DIVULGADO']
-                  oportunidades: Array.isArray(startup.oportunidades) && startup.oportunidades.length > 0 
-                    ? startup.oportunidades 
-                    : ['NÃO DIVULGADO'],
-                  // Ensure solution object has numeroColaboradores
-                  solution: startup.solution ? {
-                    ...startup.solution,
-                    numeroColaboradores: startup.solution.numeroColaboradores || 'NÃO DIVULGADO'
-                  } : {
-                    numeroColaboradores: 'NÃO DIVULGADO',
-                    porte: 'NÃO DIVULGADO',
-                    investimentos: 'NÃO DIVULGADO'
-                  }
-                }));
-                
                 return {
                   challengeTitle: 'Lista de Startups',
                   ratingExplanation: 'Startups recomendadas',
-                  startups: processedStartups,
+                  startups: parsed,
                   projectPlanning: [],
                   expectedResults: [],
                   competitiveAdvantages: []
@@ -371,41 +281,7 @@ const ChatInterface = ({ messages, addMessage, toggleSidebar, isSidebarOpen, web
         const jsonStr = content.substring(startMatch + 15, endMatch).trim();
         const parsed = JSON.parse(jsonStr);
         console.log('✅ Parsed XML format successfully');
-        
-        // Process XML format data
-        const processedData = {
-          ...parsed,
-          startups: parsed.startups ? parsed.startups.map((startup: any) => ({
-            ...startup,
-            // Ensure websiteValidated is boolean
-            websiteValidated: startup.websiteValidated === true || startup.websiteValidated === 'true',
-            // Ensure legalName is string
-            legalName: startup.legalName || 'NÃO DIVULGADO',
-            // Ensure founderLinkedIn is string
-            founderLinkedIn: startup.founderLinkedIn || 'NÃO DIVULGADO',
-            // Process keyStrengths array
-            keyStrengths: Array.isArray(startup.keyStrengths) ? startup.keyStrengths : ['NÃO DIVULGADO'],
-            // Process parceiros array - if empty, set to ['NÃO DIVULGADO']
-            parceiros: Array.isArray(startup.parceiros) && startup.parceiros.length > 0 
-              ? startup.parceiros 
-              : ['NÃO DIVULGADO'],
-            // Process oportunidades array - if empty, set to ['NÃO DIVULGADO']
-            oportunidades: Array.isArray(startup.oportunidades) && startup.oportunidades.length > 0 
-              ? startup.oportunidades 
-              : ['NÃO DIVULGADO'],
-            // Ensure solution object has numeroColaboradores
-            solution: startup.solution ? {
-              ...startup.solution,
-              numeroColaboradores: startup.solution.numeroColaboradores || 'NÃO DIVULGADO'
-            } : {
-              numeroColaboradores: 'NÃO DIVULGADO',
-              porte: 'NÃO DIVULGADO',
-              investimentos: 'NÃO DIVULGADO'
-            }
-          })) : []
-        };
-        
-        return processedData;
+        return parsed;
       }
     } catch (error) {
       console.error('Error parsing startup data:', error);
