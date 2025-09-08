@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { 
   Star, Calendar, Building2, MapPin, Users, Briefcase, Award, Edit, Save, X,
   Target, Rocket, ArrowLeft, Mail, Globe, Box, Linkedin,
-  Facebook, Twitter, Instagram, FolderOpen, Plus, Check, X, BarChart3
+  Facebook, Twitter, Instagram, FolderOpen, Plus, Check, BarChart3
 } from 'lucide-react';
 import { collection, query, orderBy, limit, getDocs, addDoc, where, deleteDoc, doc } from 'firebase/firestore';
 import { db, auth } from '../firebase';
