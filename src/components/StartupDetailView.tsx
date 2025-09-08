@@ -4,7 +4,7 @@ import {
   Star, Calendar, Building2, MapPin, Users, Briefcase, Award, 
   Globe, Mail, ArrowLeft, Edit2, Save, X, Phone, Linkedin,
   User, Target, TrendingUp, DollarSign, CheckCircle, Download,
-  Box, Rocket, Plus
+  Box, Rocket, Plus, ExternalLink, Shield
 } from 'lucide-react';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { db, auth } from '../firebase';
@@ -19,6 +19,12 @@ const formatValue = (value: any, fallback: string = 'Não informado'): string =>
   return String(value);
 };
 
+const formatList = (list: any[], fallback: string = 'Nenhum informado'): string => {
+  if (!Array.isArray(list) || list.length === 0) {
+    return fallback;
+  }
+  return list.filter(item => item && item !== 'NÃO DIVULGADO').join(', ') || fallback;
+};
 const StartupDetailView = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -392,6 +398,33 @@ const StartupDetailView = () => {
                     </div>
 
                     <div>
+                      <label className="block text-sm font-medium text-gray-600 mb-1">Website Validado</label>
+                      {isEditing ? (
+                        <select
+                          value={editData?.websiteValidated ? 'true' : 'false'}
+                          onChange={(e) => handleInputChange('websiteValidated', e.target.value === 'true')}
+                          className="w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded text-black focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        >
+                          <option value="true">Sim</option>
+                          <option value="false">Não</option>
+                        </select>
+                      ) : (
+                        <div className="flex items-center gap-2">
+                          {displayData.websiteValidated ? (
+                            <>
+                              <CheckCircle size={16} className="text-green-600" />
+                              <span className="text-black">Sim</span>
+                            </>
+                          ) : (
+                            <>
+                              <X size={16} className="text-red-600" />
+                              <span className="text-black">Não</span>
+                            </>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                    <div>
                       <label className="block text-sm font-medium text-gray-600 mb-1">Modelo de Negócio</label>
                       {isEditing ? (
                         <input
@@ -491,6 +524,69 @@ const StartupDetailView = () => {
                 </div>
               </div>
 
+              {/* Key Strengths */}
+              {displayData.keyStrengths && displayData.keyStrengths.length > 0 && (
+                <div>
+                  <h3 className="text-xl font-bold text-black mb-4">Principais Pontos Fortes</h3>
+                  {isEditing ? (
+                    <textarea
+                      value={Array.isArray(editData?.keyStrengths) ? editData.keyStrengths.join(', ') : ''}
+                      onChange={(e) => handleInputChange('keyStrengths', e.target.value.split(', ').filter(s => s.trim()))}
+                      rows={3}
+                      className="w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded text-black focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                      placeholder="Separar por vírgulas"
+                    />
+                  ) : (
+                    <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                      <ul className="list-disc list-inside space-y-1">
+                        {displayData.keyStrengths.filter(strength => strength && strength !== 'NÃO DIVULGADO').map((strength, index) => (
+                          <li key={index} className="text-black">{strength}</li>
+                        ))}
+                        {displayData.keyStrengths.filter(strength => strength && strength !== 'NÃO DIVULGADO').length === 0 && (
+                          <li className="text-gray-600">Não informado</li>
+                        )}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Partners */}
+              <div>
+                <h3 className="text-xl font-bold text-black mb-4">Parceiros</h3>
+                {isEditing ? (
+                  <textarea
+                    value={Array.isArray(editData?.parceiros) ? editData.parceiros.join(', ') : ''}
+                    onChange={(e) => handleInputChange('parceiros', e.target.value.split(', ').filter(s => s.trim()))}
+                    rows={3}
+                    className="w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded text-black focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                    placeholder="Separar por vírgulas"
+                  />
+                ) : (
+                  <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                    <p className="text-black">{formatList(displayData.parceiros)}</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Opportunities */}
+              <div>
+                <h3 className="text-xl font-bold text-black mb-4">Oportunidades</h3>
+                {isEditing ? (
+                  <textarea
+                    value={Array.isArray(editData?.oportunidades) ? editData.oportunidades.join(', ') : ''}
+                    onChange={(e) => handleInputChange('oportunidades', e.target.value.split(', ').filter(s => s.trim()))}
+                    rows={3}
+                    className="w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded text-black focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                    placeholder="Separar por vírgulas"
+                  />
+                ) : (
+                  <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                    <p className="text-black">{formatList(displayData.oportunidades)}</p>
+                  </div>
+                )}
+              </div>
+
               {/* Problem Solution */}
               <div>
                 <h3 className="text-xl font-bold text-black mb-4">Problema que Resolve</h3>
@@ -526,6 +622,20 @@ const StartupDetailView = () => {
                         </select>
                       ) : (
                         <p className="text-black">{formatValue(displayData.solution.porte)}</p>
+                      )}
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-600 mb-1">Número de Colaboradores</label>
+                      {isEditing ? (
+                        <input
+                          type="text"
+                          value={editData?.solution?.numeroColaboradores}
+                          onChange={(e) => handleInputChange('solution.numeroColaboradores', e.target.value)}
+                          className="w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded text-black focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                      ) : (
+                        <p className="text-black">{formatValue(displayData.solution.numeroColaboradores)}</p>
                       )}
                     </div>
 
@@ -820,6 +930,25 @@ const StartupDetailView = () => {
                     </div>
                   )}
                 </div>
+                  {displayData.founderLinkedIn && displayData.founderLinkedIn !== 'NÃO DIVULGADO' && (
+                    <div className="flex items-center gap-3">
+                      <Linkedin className="text-blue-700" size={20} />
+                      <span className="text-gray-600 text-sm">Fundador:</span>
+                      {isEditing ? (
+                        <input
+                          type="url"
+                          value={editData?.founderLinkedIn}
+                          onChange={(e) => handleInputChange('founderLinkedIn', e.target.value)}
+                          className="flex-1 px-3 py-2 bg-white border border-gray-300 rounded text-black focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                      ) : (
+                        <a href={displayData.founderLinkedIn} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-700 flex items-center gap-1">
+                          LinkedIn do Fundador
+                          <ExternalLink size={12} />
+                        </a>
+                      )}
+                    </div>
+                  )}
               </div>
 
               {/* Key Metrics */}
@@ -884,23 +1013,6 @@ const StartupDetailView = () => {
             </div>
           </div>
 
-          {/* Reason for Choice */}
-          <div className="mt-8 pt-6 border-t border-gray-300">
-            <h3 className="text-xl font-bold text-black mb-4">Razão da Escolha</h3>
-            <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-              {isEditing ? (
-                <textarea
-                  value={editData?.reasonForChoice}
-                  onChange={(e) => handleInputChange('reasonForChoice', e.target.value)}
-                  rows={3}
-                  className="w-full px-3 py-2 bg-white border border-gray-300 rounded text-black focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-                  placeholder="Razão da escolha..."
-                />
-              ) : (
-                <p className="text-gray-700">{formatValue(displayData.reasonForChoice, 'Razão da escolha não informada')}</p>
-              )}
-            </div>
-          </div>
         </div>
       </div>
     </div>
