@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { 
   Star, Calendar, Building2, MapPin, Users, Briefcase, Award, 
   Target, Rocket, ArrowLeft, Globe, Box, Linkedin,
-  Facebook, Twitter, Instagram, Heart, HeartOff, Plus, Check, X,
+  Facebook, Twitter, Instagram, Trash2, FolderOpen, Plus, Check, X, BarChart3
   Mail, Phone, User, TrendingUp, DollarSign, CheckCircle, Download,
   Shield, Code, Tag, Zap, ExternalLink
 } from 'lucide-react';
