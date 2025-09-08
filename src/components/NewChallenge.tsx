@@ -138,7 +138,7 @@ const NewChallenge = () => {
       console.log('Sending webhook message:', {
         sessionId,
         message,
-        challengeId: challengeRef.id
+        challengeId: challengeRef.id,
         environment: webhookEnvironment
       });
 

@@ -339,7 +339,13 @@ const ChatInterface = ({ messages, addMessage, toggleSidebar, isSidebarOpen, web
         setResponseDelay(0);
 
         if (!response.ok) {
-          throw new Error('Failed to send message to webhook');
+          console.error(`Webhook returned ${response.status}: ${response.statusText}`);
+          await addMessage({
+            role: 'assistant',
+            content: 'Desculpe, o serviço está temporariamente indisponível. Por favor, tente novamente em alguns instantes.',
+            timestamp: new Date().toISOString()
+          });
+          return;
         }
 
         const data = await response.json();
@@ -387,9 +393,19 @@ const ChatInterface = ({ messages, addMessage, toggleSidebar, isSidebarOpen, web
         }
       } catch (error) {
         console.error('Error in chat:', error);
+        
+        // Handle different types of network errors
+        let errorMessage = 'Desculpe, ocorreu um erro ao processar sua mensagem. Por favor, tente novamente.';
+        
+        if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
+          errorMessage = 'Não foi possível conectar ao servidor. Verifique sua conexão com a internet e tente novamente.';
+        } else if (error instanceof TypeError && (error.message.includes('NetworkError') || error.message.includes('fetch'))) {
+          errorMessage = 'Problema de conectividade detectado. Verifique sua conexão com a internet ou tente novamente mais tarde.';
+        }
+        
         await addMessage({
           role: 'assistant',
-          content: 'Desculpe, ocorreu um erro ao processar sua mensagem. Por favor, tente novamente.',
+          content: errorMessage,
           timestamp: new Date().toISOString()
         });
         scrollToBottom();
