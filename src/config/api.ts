@@ -13,14 +13,14 @@ export const API_CONFIG = {
   },
   adminWebhooks: {
     test: {
-      list: '/api/admin-api/webhook-test/capta-startups',
-      delete: '/api/admin-api/webhook-test/deleta-startups',
-      search: '/api/admin-api/webhook-test/busca-startups'
+      list: 'https://n8n.genoiapp.com/webhook-test/capta-startups',
+      delete: 'https://n8n.genoiapp.com/webhook-test/deleta-startups',
+      search: 'https://n8n.genoiapp.com/webhook-test/busca-startups'
     },
     production: {
-      list: '/api/admin-api/webhook/capta-startups',
-      delete: '/api/admin-api/webhook/deleta-startups',
-      search: '/api/admin-api/webhook/busca-startups'
+      list: 'https://n8n.genoiapp.com/webhook/capta-startups',
+      delete: 'https://n8n.genoiapp.com/webhook/deleta-startups',
+      search: 'https://n8n.genoiapp.com/webhook/busca-startups'
     }
   }
 };
