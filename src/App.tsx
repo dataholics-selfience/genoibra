@@ -80,7 +80,6 @@ function App() {
         <Route path="/register/:token" element={!user ? <TokenRegister /> : <Navigate to="/" replace />} />
         <Route path="/invite/:slug" element={!user ? <SlugRegister /> : <Navigate to="/" replace />} />
         <Route path="/forgot-password" element={!user ? <ForgotPassword /> : <Navigate to="/" replace />} />
-        <Route path="/verify-email" element={user ? <EmailVerification /> : <Navigate to="/login" replace />} />
         <Route path="/challenge/:slug" element={<PublicChallenge />} />
         
         {/* Protected Routes */}
@@ -88,7 +87,6 @@ function App() {
         <Route path="/new-challenge" element={user ? <NewChallenge /> : <Navigate to="/login" replace />} />
         <Route path="/startups" element={user ? <StartupList /> : <Navigate to="/login" replace />} />
         <Route path="/saved-startups" element={user ? <SavedStartups /> : <Navigate to="/login" replace />} />
-        <Route path="/startup/:startupId/detail" element={user ? <StartupDetailView /> : <Navigate to="/login" replace />} />
         <Route path="/account-deleted" element={<AccountDeleted />} />
         
         {/* Admin Route - Only for contact@dataholics.io */}

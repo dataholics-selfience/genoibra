@@ -258,7 +258,7 @@ const StartupDetailView = () => {
                   ) : (
                     <Download size={16} />
                   )}
-                  {isExportingPDF ? 'Gerando...' : 'Gerar card'}
+                  {isExportingPDF ? 'Gerando...' : 'Salvar PDF'}
                 </button>
                 <button
                   onClick={() => setIsEditing(true)}

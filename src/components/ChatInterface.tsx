@@ -229,15 +229,46 @@ const ChatInterface = ({ messages, addMessage, toggleSidebar, isSidebarOpen, web
           // Check if it's the new format with startups array
           if (parsed[0].startups && Array.isArray(parsed[0].startups)) {
             console.log('✅ Detected new JSON format with startups array');
-            return parsed[0];
+            // Parse missing fields for each startup
+            const processedData = { ...parsed[0] };
+            if (processedData.startups) {
+              processedData.startups = processedData.startups.map((startup: any) => ({
+                ...startup,
+                websiteValidated: startup.websiteValidated !== undefined ? startup.websiteValidated : false,
+                legalName: startup.legalName || 'NÃO DIVULGADO',
+                founderLinkedIn: startup.founderLinkedIn || 'NÃO DIVULGADO',
+                keyStrengths: startup.keyStrengths || ['NÃO DIVULGADO'],
+                parceiros: startup.parceiros || [],
+                oportunidades: startup.oportunidades || [],
+                solution: {
+                  ...startup.solution,
+                  numeroColaboradores: startup.solution?.numeroColaboradores || 'NÃO DIVULGADO'
+                }
+              }));
+            }
+            return processedData;
           }
           // Check if it's old format with direct startup objects
           if (parsed[0].name && parsed[0].rating !== undefined) {
             console.log('✅ Detected old JSON format, converting to new format');
+            // Process old format startups with missing fields
+            const processedStartups = parsed.map((startup: any) => ({
+              ...startup,
+              websiteValidated: startup.websiteValidated !== undefined ? startup.websiteValidated : false,
+              legalName: startup.legalName || 'NÃO DIVULGADO',
+              founderLinkedIn: startup.founderLinkedIn || 'NÃO DIVULGADO',
+              keyStrengths: startup.keyStrengths || ['NÃO DIVULGADO'],
+              parceiros: startup.parceiros || [],
+              oportunidades: startup.oportunidades || [],
+              solution: {
+                ...startup.solution,
+                numeroColaboradores: startup.solution?.numeroColaboradores || 'NÃO DIVULGADO'
+              }
+            }));
             return {
               challengeTitle: 'Lista de Startups',
               ratingExplanation: 'Startups recomendadas',
-              startups: parsed,
+              startups: processedStartups,
               projectPlanning: [],
               expectedResults: [],
               competitiveAdvantages: []
@@ -261,10 +292,24 @@ const ChatInterface = ({ messages, addMessage, toggleSidebar, isSidebarOpen, web
               const parsed = JSON.parse(jsonMatch[0]);
               if (Array.isArray(parsed) && parsed.length > 0) {
                 console.log('✅ Found JSON in content, converting to new format');
+                // Process found JSON with missing fields
+                const processedStartups = parsed.map((startup: any) => ({
+                  ...startup,
+                  websiteValidated: startup.websiteValidated !== undefined ? startup.websiteValidated : false,
+                  legalName: startup.legalName || 'NÃO DIVULGADO',
+                  founderLinkedIn: startup.founderLinkedIn || 'NÃO DIVULGADO',
+                  keyStrengths: startup.keyStrengths || ['NÃO DIVULGADO'],
+                  parceiros: startup.parceiros || [],
+                  oportunidades: startup.oportunidades || [],
+                  solution: {
+                    ...startup.solution,
+                    numeroColaboradores: startup.solution?.numeroColaboradores || 'NÃO DIVULGADO'
+                  }
+                }));
                 return {
                   challengeTitle: 'Lista de Startups',
                   ratingExplanation: 'Startups recomendadas',
-                  startups: parsed,
+                  startups: processedStartups,
                   projectPlanning: [],
                   expectedResults: [],
                   competitiveAdvantages: []
@@ -281,6 +326,24 @@ const ChatInterface = ({ messages, addMessage, toggleSidebar, isSidebarOpen, web
         const jsonStr = content.substring(startMatch + 15, endMatch).trim();
         const parsed = JSON.parse(jsonStr);
         console.log('✅ Parsed XML format successfully');
+        // Process XML format with missing fields
+        if (parsed.startups && Array.isArray(parsed.startups)) {
+          const processedData = { ...parsed };
+          processedData.startups = processedData.startups.map((startup: any) => ({
+            ...startup,
+            websiteValidated: startup.websiteValidated !== undefined ? startup.websiteValidated : false,
+            legalName: startup.legalName || 'NÃO DIVULGADO',
+            founderLinkedIn: startup.founderLinkedIn || 'NÃO DIVULGADO',
+            keyStrengths: startup.keyStrengths || ['NÃO DIVULGADO'],
+            parceiros: startup.parceiros || [],
+            oportunidades: startup.oportunidades || [],
+            solution: {
+              ...startup.solution,
+              numeroColaboradores: startup.solution?.numeroColaboradores || 'NÃO DIVULGADO'
+            }
+          }));
+          return processedData;
+        }
         return parsed;
       }
     } catch (error) {
