@@ -4,6 +4,7 @@ import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { auth, db } from './firebase';
 import { doc, getDoc } from 'firebase/firestore';
 import { initializeLanguage } from './utils/i18n';
+import { needsLoginVerification, clearVerificationState } from './utils/verificationStateManager';
 import Layout from './components/Layout';
 import Login from './components/auth/Login';
 import Register from './components/auth/Register';
@@ -18,11 +19,13 @@ import SudoAdminInterface from './components/admin/SudoAdminInterface';
 import TokenRegister from './components/auth/TokenRegister';
 import SlugRegister from './components/auth/SlugRegister';
 import PublicChallenge from './components/PublicChallenge';
+import LoginVerification from './components/auth/LoginVerification';
 
 function App() {
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [languageInitialized, setLanguageInitialized] = useState(false);
+  const [needsVerification, setNeedsVerification] = useState(false);
 
   useEffect(() => {
     // Initialize language detection
@@ -47,15 +50,29 @@ function App() {
           if (userDoc.exists() && userDoc.data().disabled) {
             await signOut(auth);
             setUser(null);
+            setNeedsVerification(false);
+            clearVerificationState(user.uid);
           } else {
             setUser(user);
+            // Check if user needs verification based on time and session
+            const needsVerification = needsLoginVerification(user.uid);
+            setNeedsVerification(needsVerification);
+            
+            console.log(`🔐 Verificação de login necessária: ${needsVerification ? 'SIM' : 'NÃO'}`);
           }
         } catch (error) {
           console.error('Error checking user status:', error);
           setUser(user);
+          // On error, require verification to be safe
+          setNeedsVerification(true);
         }
       } else {
         setUser(null);
+        setNeedsVerification(false);
+        // Clear verification state on logout
+        if (user) {
+          clearVerificationState(user.uid);
+        }
       }
       setLoading(false);
     });
@@ -82,21 +99,73 @@ function App() {
         <Route path="/forgot-password" element={!user ? <ForgotPassword /> : <Navigate to="/" replace />} />
         <Route path="/challenge/:slug" element={<PublicChallenge />} />
         
+        {/* Login Verification Route - Required for all authenticated users */}
+        <Route 
+          path="/verify-login" 
+          element={
+            user && needsVerification ? (
+              <LoginVerification />
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          } 
+        />
+        
         {/* Protected Routes */}
-        <Route path="/profile" element={user ? <UserManagement /> : <Navigate to="/login" replace />} />
-        <Route path="/new-challenge" element={user ? <NewChallenge /> : <Navigate to="/login" replace />} />
-        <Route path="/startups" element={user ? <StartupList /> : <Navigate to="/login" replace />} />
-        <Route path="/saved-startups" element={user ? <SavedStartups /> : <Navigate to="/login" replace />} />
+        <Route 
+          path="/profile" 
+          element={
+            user ? (
+              needsVerification ? <Navigate to="/verify-login" replace /> : <UserManagement />
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          } 
+        />
+        <Route 
+          path="/new-challenge" 
+          element={
+            user ? (
+              needsVerification ? <Navigate to="/verify-login" replace /> : <NewChallenge />
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          } 
+        />
+        <Route 
+          path="/startups" 
+          element={
+            user ? (
+              needsVerification ? <Navigate to="/verify-login" replace /> : <StartupList />
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          } 
+        />
+        <Route 
+          path="/saved-startups" 
+          element={
+            user ? (
+              needsVerification ? <Navigate to="/verify-login" replace /> : <SavedStartups />
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          } 
+        />
         <Route path="/account-deleted" element={<AccountDeleted />} />
         
         {/* Admin Route - Only for contact@dataholics.io */}
         <Route 
           path="/admin" 
           element={
-            user && user?.email === 'contact@dataholics.io' ? (
-              <AdminInterface />
+            user ? (
+              user?.email === 'contact@dataholics.io' ? (
+                needsVerification ? <Navigate to="/verify-login" replace /> : <AdminInterface />
+              ) : (
+                <Navigate to="/" replace />
+              )
             ) : (
-              <Navigate to="/" replace />
+              <Navigate to="/login" replace />
             )
           } 
         />
@@ -105,10 +174,14 @@ function App() {
         <Route 
           path="/sudo-admin" 
           element={
-            user && user?.email === 'daniel.mendes@dataholics.io' ? (
-              <SudoAdminInterface />
+            user ? (
+              user?.email === 'daniel.mendes@dataholics.io' ? (
+                needsVerification ? <Navigate to="/verify-login" replace /> : <SudoAdminInterface />
+              ) : (
+                <Navigate to="/" replace />
+              )
             ) : (
-              <Navigate to="/" replace />
+              <Navigate to="/login" replace />
             )
           } 
         />
@@ -116,7 +189,7 @@ function App() {
         {/* Default Route */}
         <Route path="/" element={
           user ? (
-            <Layout />
+            needsVerification ? <Navigate to="/verify-login" replace /> : <Layout />
           ) : (
             <Navigate to="/login" replace />
           )

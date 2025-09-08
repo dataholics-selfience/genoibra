@@ -78,6 +78,11 @@ const Sidebar = ({ isOpen, toggleSidebar, challenges, currentChallengeId, onSele
 
   const handleLogout = async () => {
     try {
+      // Clear verification state before logout
+      if (auth.currentUser) {
+        const { clearVerificationState } = await import('../utils/verificationStateManager');
+        clearVerificationState(auth.currentUser.uid);
+      }
       await signOut(auth);
     } catch (error) {
       console.error('Error signing out:', error);
