@@ -53,6 +53,12 @@ export function markUserAsVerified(userId: string): void {
     };
 
     localStorage.setItem(`${VERIFICATION_STORAGE_KEY}_${userId}`, JSON.stringify(state));
+    console.log('✅ Usuário marcado como verificado:', userId);
+  
+    // Force page reload to ensure state is properly updated
+    setTimeout(() => {
+      window.location.reload();
+    }, 100);
   } catch (error) {
     console.error('Error marking user as verified:', error);
   }
@@ -64,6 +70,7 @@ export function markUserAsVerified(userId: string): void {
 export function clearVerificationState(userId: string): void {
   try {
     localStorage.removeItem(`${VERIFICATION_STORAGE_KEY}_${userId}`);
+    console.log('🗑️ Estado de verificação limpo para usuário:', userId);
   } catch (error) {
     console.error('Error clearing verification state:', error);
   }
@@ -75,6 +82,7 @@ export function clearVerificationState(userId: string): void {
 export function forceNewVerification(userId: string): void {
   try {
     clearVerificationState(userId);
+    console.log('🔄 Nova verificação forçada para usuário:', userId);
   } catch (error) {
     console.error('Error forcing new verification:', error);
   }

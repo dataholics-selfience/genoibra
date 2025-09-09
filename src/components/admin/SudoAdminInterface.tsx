@@ -11,10 +11,12 @@ import {
   deleteDoc, 
   doc, 
   query, 
-  orderBy
+  orderBy,
+  getDoc
 } from 'firebase/firestore';
 import { auth, db } from '../../firebase';
 import QRCode from 'qrcode';
+import { EmailService } from '../../utils/emailService';
 
 interface RegistrationToken {
   id: string;
@@ -181,14 +183,14 @@ const SudoAdminInterface = () => {
           name: email.split('@')[0] 
         }],
         from: { 
-          email: 'contact@genoi.com.br', 
+          email: 'noreply@genoi.com.br', 
           name: 'Gen.OI - Acesso Temporário' 
         },
         subject: `Código de Acesso Gen.OI: ${verificationCode}`,
         html: emailHtml,
         text: `Seu código de verificação Gen.OI: ${verificationCode}\n\nAcesse: ${registrationUrl}\n\nEste código expira em 12 horas.`,
         reply_to: { 
-          email: 'contact@genoi.net', 
+          email: 'noreply@genoi.com.br', 
           name: 'Gen.OI - Suporte' 
         },
         tags: ['admin', 'registration-code'],
@@ -200,7 +202,45 @@ const SudoAdminInterface = () => {
       };
 
       console.log('Enviando email com código de verificação:', { email, verificationCode });
-      await addDoc(collection(db, 'emails'), emailPayload);
+      
+      // Usar o serviço de email com retry
+      const emailResult = await EmailService.sendEmail(EmailService.createStandardPayload(
+        { email: email.toLowerCase(), name: email.split('@')[0] },
+        `Código de Acesso Gen.OI: ${verificationCode}`,
+        emailHtml,
+        `Seu código de verificação Gen.OI: ${verificationCode}\n\nAcesse: ${registrationUrl}\n\nEste código expira em 12 horas.`,
+        ['admin', 'registration-code'],
+        { 
+          tokenId: docRef.id,
+          verificationCode,
+          registrationType: 'temporary_access'
+        }
+      ));
+
+      if (!emailResult.success) {
+        throw new Error(`Falha no envio do email: ${emailResult.error}`);
+      }
+
+      console.log('✅ Email enviado com sucesso via EmailService:', emailResult.docId);
+      
+      const emailDocRef = await addDoc(collection(db, 'emailLogs'), {
+        docId: emailResult.docId,
+        email: emailPayload.to[0].email,
+        from: emailPayload.from.email,
+        timestamp: new Date().toISOString()
+      });
+      
+      // Aguardar um pouco para garantir que o documento foi salvo
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Verificar se o documento foi realmente criado
+      const createdDoc = await getDoc(emailDocRef);
+      if (createdDoc.exists()) {
+        console.log('✅ Documento confirmado no Firestore:', createdDoc.data());
+      } else {
+        console.error('❌ Documento não foi criado no Firestore');
+        throw new Error('Falha ao criar documento de email');
+      }
       
       const newToken: RegistrationToken = {
         id: docRef.id,

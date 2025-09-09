@@ -10,6 +10,7 @@ import { ChallengeType, StartupListType } from '../types';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useTranslation } from '../utils/i18n';
+import { clearVerificationState } from '../utils/verificationStateManager';
 
 interface SidebarProps {
   isOpen: boolean;
@@ -78,6 +79,10 @@ const Sidebar = ({ isOpen, toggleSidebar, challenges, currentChallengeId, onSele
 
   const handleLogout = async () => {
     try {
+      // Clear verification state before logout
+      if (auth.currentUser) {
+        clearVerificationState(auth.currentUser.uid);
+      }
       await signOut(auth);
     } catch (error) {
       console.error('Error signing out:', error);

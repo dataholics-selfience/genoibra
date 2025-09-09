@@ -23,6 +23,7 @@ import {
   ArrowLeft
 } from 'lucide-react';
 import { markUserAsVerified } from '../../utils/verificationStateManager';
+import { EmailService } from '../../utils/emailService';
 
 interface LoginVerification {
   id: string;
@@ -41,14 +42,13 @@ const LoginVerification = () => {
   const [verificationCode, setVerificationCode] = useState('');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
   const [sendingCode, setSendingCode] = useState(false);
   const [verifyingCode, setVerifyingCode] = useState(false);
   const [countdown, setCountdown] = useState(0);
   const [attempts, setAttempts] = useState(0);
   const [cooldownTime, setCooldownTime] = useState(0);
   const [currentVerification, setCurrentVerification] = useState<LoginVerification | null>(null);
-  const [hasInitialCode, setHasInitialCode] = useState(false);
+  const [emailSent, setEmailSent] = useState(false);
 
   // Countdown timers
   useEffect(() => {
@@ -83,19 +83,21 @@ const LoginVerification = () => {
     return () => clearInterval(timer);
   }, [cooldownTime]);
 
-  // Check if user is authenticated and send initial code
+  // Check if user is authenticated
   useEffect(() => {
     if (!auth.currentUser) {
       navigate('/login');
       return;
     }
 
-    // Send initial verification code only once
-    if (!hasInitialCode) {
-      sendVerificationCode();
-      setHasInitialCode(true);
+    // Bypass verification for admin
+    if (auth.currentUser.email === 'daniel.mendes@dataholics.io') {
+      console.log('🔓 Admin user detected, bypassing login verification');
+      markUserAsVerified(auth.currentUser.uid);
+      navigate('/', { replace: true });
+      return;
     }
-  }, [navigate, hasInitialCode]);
+  }, [navigate]);
 
   const generateVerificationCode = (): string => {
     return Math.random().toString(36).substring(2, 8).toUpperCase();
@@ -206,48 +208,39 @@ const LoginVerification = () => {
         </html>
       `;
 
-      const emailPayload = {
-        to: [{ 
-          email: auth.currentUser.email!, 
-          name: auth.currentUser.email!.split('@')[0] 
-        }],
-        from: { 
-          email: 'contact@genoi.com.br', 
-          name: 'Gen.OI - Verificação de Segurança' 
-        },
-        subject: `🔐 Código de Verificação Gen.OI: ${verificationCode}`,
-        html: emailHtml,
-        text: `Código de verificação de segurança Gen.OI: ${verificationCode}\n\nEste código expira em 5 minutos.\n\nSe você não solicitou este código, ignore este email.`,
-        reply_to: { 
-          email: 'contact@genoi.net', 
-          name: 'Gen.OI - Suporte' 
-        },
-        tags: ['security', 'login-verification'],
-        metadata: { 
+      console.log('🚀 Enviando email de verificação de login via EmailService...');
+
+      // Usar o serviço de email com retry
+      const emailResult = await EmailService.sendEmail(EmailService.createStandardPayload(
+        { email: auth.currentUser.email!, name: auth.currentUser.email!.split('@')[0] },
+        `🔐 Código de Verificação Gen.OI: ${verificationCode}`,
+        emailHtml,
+        `Código de verificação de segurança Gen.OI: ${verificationCode}\n\nEste código expira em 5 minutos.\n\nSe você não solicitou este código, ignore este email.`,
+        ['security', 'login-verification'],
+        { 
           userId: auth.currentUser.uid,
           verificationCode,
           loginVerification: true,
           attempt: attempts + 1
         }
-      };
+      ));
 
-      console.log('Enviando email de verificação de login:', { 
-        email: auth.currentUser.email, 
-        code: verificationCode,
-        attempt: attempts + 1
-      });
-      
-      await addDoc(collection(db, 'emails'), emailPayload);
+      if (!emailResult.success) {
+        throw new Error(`Falha no envio do email: ${emailResult.error}`);
+      }
+
+      console.log('✅ Email de verificação enviado com sucesso:', emailResult.docId);
 
       setAttempts(prev => prev + 1);
       setCountdown(300); // 5 minutes
+      setEmailSent(true);
       setSuccess('Código de verificação enviado! Verifique seu email.');
       
       // Clear success message after 3 seconds
       setTimeout(() => setSuccess(''), 3000);
 
     } catch (error) {
-      console.error('Error sending verification code:', error);
+      console.error('❌ Error sending verification code:', error);
       setError('Erro ao enviar código de verificação. Tente novamente.');
     } finally {
       setSendingCode(false);
@@ -271,6 +264,7 @@ const LoginVerification = () => {
       if (now > expiresAt) {
         setError('Código expirado. Solicite um novo código.');
         setCountdown(0);
+        setEmailSent(false);
         setVerifyingCode(false);
         return;
       }
@@ -304,8 +298,8 @@ const LoginVerification = () => {
 
       console.log('🎉 Verificação de login concluída com sucesso!');
       
-      // Redirect to dashboard
-      navigate('/', { replace: true });
+      // Force immediate redirect to chat interface
+      window.location.href = '/';
       
     } catch (error) {
       console.error('Error verifying code:', error);
@@ -336,7 +330,9 @@ const LoginVerification = () => {
 
   const handleRequestNewCode = () => {
     if (canRequestNewCode()) {
-      sendVerificationCode();
+      setEmailSent(false);
+      setVerificationCode('');
+      setCurrentVerification(null);
     }
   };
 
@@ -355,7 +351,7 @@ const LoginVerification = () => {
             <h1 className="text-2xl font-bold text-white">Verificação de Segurança</h1>
           </div>
           <p className="text-gray-400">
-            Para garantir a segurança da sua conta, enviamos um código de verificação para seu email.
+            Para garantir a segurança da sua conta, precisamos verificar sua identidade.
           </p>
         </div>
 
@@ -364,7 +360,7 @@ const LoginVerification = () => {
           <div className="flex items-center gap-3">
             <Mail size={20} className="text-blue-400" />
             <div>
-              <p className="text-white font-medium">Código enviado para:</p>
+              <p className="text-white font-medium">Usuário logado:</p>
               <p className="text-gray-400 text-sm">{auth.currentUser?.email}</p>
             </div>
           </div>
@@ -388,10 +384,11 @@ const LoginVerification = () => {
         {/* Verification Form */}
         <div className="bg-gray-800 rounded-lg p-6 mb-6">
           <div className="space-y-4">
+            {/* Verification Code Input */}
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-2">
-                Código de Verificação
-                {countdown > 0 && (
+                Código de Verificação (6 dígitos)
+                {countdown > 0 && emailSent && (
                   <span className="text-yellow-400 ml-2">
                     (Expira em {formatTime(countdown)})
                   </span>
@@ -404,73 +401,93 @@ const LoginVerification = () => {
                 className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white text-center text-xl font-mono tracking-widest focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="XXXXXX"
                 maxLength={6}
-                disabled={verifyingCode || countdown === 0}
+                disabled={verifyingCode}
               />
             </div>
 
-            <button
-              onClick={verifyCode}
-              disabled={verifyingCode || !verificationCode.trim() || countdown === 0}
-              className={`w-full py-3 px-4 rounded-lg font-medium transition-colors ${
-                verifyingCode || !verificationCode.trim() || countdown === 0
-                  ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
-                  : 'bg-blue-600 hover:bg-blue-700 text-white'
-              }`}
-            >
-              {verifyingCode ? (
-                <div className="flex items-center justify-center gap-2">
-                  <div className="w-5 h-5 border-2 border-gray-300 border-t-transparent rounded-full animate-spin" />
-                  Verificando...
-                </div>
-              ) : (
-                'Verificar Código'
-              )}
-            </button>
-          </div>
-        </div>
-
-        {/* Request New Code */}
-        <div className="bg-gray-800 rounded-lg p-6 mb-6">
-          <div className="text-center">
-            <p className="text-gray-300 text-sm mb-4">
-              Não recebeu o código ou ele expirou?
-            </p>
-            
-            {cooldownTime > 0 ? (
-              <div className="bg-red-900/20 border border-red-600 rounded-lg p-4">
-                <div className="flex items-center justify-center gap-2 mb-2">
-                  <Clock size={16} className="text-red-400" />
-                  <span className="text-red-200 font-medium">Aguarde para tentar novamente</span>
-                </div>
-                <p className="text-red-100 text-sm">
-                  Tempo restante: {formatTime(cooldownTime)}
-                </p>
-              </div>
+            {/* Send Code Button */}
+            {!emailSent ? (
+              <button
+                onClick={sendVerificationCode}
+                disabled={sendingCode || cooldownTime > 0}
+                className={`w-full py-3 px-4 rounded-lg font-medium transition-colors ${
+                  sendingCode || cooldownTime > 0
+                    ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
+                    : 'bg-blue-600 hover:bg-blue-700 text-white'
+                }`}
+              >
+                {sendingCode ? (
+                  <div className="flex items-center justify-center gap-2">
+                    <div className="w-5 h-5 border-2 border-gray-300 border-t-transparent rounded-full animate-spin" />
+                    Enviando código...
+                  </div>
+                ) : cooldownTime > 0 ? (
+                  `Aguarde ${formatTime(cooldownTime)}`
+                ) : (
+                  <div className="flex items-center justify-center gap-2">
+                    <Mail size={20} />
+                    Enviar Email de Verificação
+                  </div>
+                )}
+              </button>
             ) : (
               <button
-                onClick={handleRequestNewCode}
-                disabled={sendingCode || !canRequestNewCode()}
-                className={`flex items-center justify-center gap-2 px-4 py-2 rounded-lg transition-colors ${
-                  sendingCode || !canRequestNewCode()
+                onClick={verifyCode}
+                disabled={verifyingCode || !verificationCode.trim() || countdown === 0}
+                className={`w-full py-3 px-4 rounded-lg font-medium transition-colors ${
+                  verifyingCode || !verificationCode.trim() || countdown === 0
                     ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
                     : 'bg-green-600 hover:bg-green-700 text-white'
                 }`}
               >
-                {sendingCode ? (
-                  <>
-                    <div className="w-4 h-4 border-2 border-gray-300 border-t-transparent rounded-full animate-spin" />
-                    Enviando...
-                  </>
+                {verifyingCode ? (
+                  <div className="flex items-center justify-center gap-2">
+                    <div className="w-5 h-5 border-2 border-gray-300 border-t-transparent rounded-full animate-spin" />
+                    Verificando...
+                  </div>
                 ) : (
-                  <>
-                    <RefreshCw size={16} />
-                    Enviar Novo Código ({3 - attempts} tentativas restantes)
-                  </>
+                  'Verificar Código'
                 )}
               </button>
             )}
           </div>
         </div>
+
+        {/* Request New Code */}
+        {emailSent && (
+          <div className="bg-gray-800 rounded-lg p-6 mb-6">
+            <div className="text-center">
+              <p className="text-gray-300 text-sm mb-4">
+                Não recebeu o código ou ele expirou?
+              </p>
+              
+              {cooldownTime > 0 ? (
+                <div className="bg-red-900/20 border border-red-600 rounded-lg p-4">
+                  <div className="flex items-center justify-center gap-2 mb-2">
+                    <Clock size={16} className="text-red-400" />
+                    <span className="text-red-200 font-medium">Aguarde para tentar novamente</span>
+                  </div>
+                  <p className="text-red-100 text-sm">
+                    Tempo restante: {formatTime(cooldownTime)}
+                  </p>
+                </div>
+              ) : countdown === 0 ? (
+                <button
+                  onClick={handleRequestNewCode}
+                  disabled={sendingCode}
+                  className={`flex items-center justify-center gap-2 px-4 py-2 rounded-lg transition-colors ${
+                    sendingCode
+                      ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
+                      : 'bg-green-600 hover:bg-green-700 text-white'
+                  }`}
+                >
+                  <RefreshCw size={16} />
+                  Solicitar Novo Código ({3 - attempts} tentativas restantes)
+                </button>
+              ) : null}
+            </div>
+          </div>
+        )}
 
         {/* Instructions */}
         <div className="bg-blue-900/20 border border-blue-600 rounded-lg p-4 mb-6">
@@ -479,11 +496,12 @@ const LoginVerification = () => {
             Instruções de Segurança
           </h4>
           <ul className="text-blue-100 text-sm space-y-1">
-            <li>• O código tem 6 caracteres e expira em 5 minutos</li>
+            <li>• Digite o código de 6 dígitos e clique em "Enviar Email de Verificação"</li>
+            <li>• Verifique seu email e digite o código recebido</li>
+            <li>• O código expira em 5 minutos</li>
             <li>• Você tem até 3 tentativas para solicitar novos códigos</li>
             <li>• Após 3 tentativas, aguarde 5 minutos para tentar novamente</li>
             <li>• Nunca compartilhe este código com terceiros</li>
-            <li>• Se não solicitou este código, ignore o email</li>
           </ul>
         </div>
 

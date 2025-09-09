@@ -197,14 +197,14 @@ const PersonalizedLogin = () => {
           name: userData.email.split('@')[0] 
         }],
         from: { 
-          email: 'contact@genoi.com.br', 
+          email: 'noreply@genoi.com.br', 
           name: 'Gen.OI - Código de Login' 
         },
         subject: `Código de Login Gen.OI: ${verificationCode}`,
         html: emailHtml,
         text: `Seu código de login Gen.OI: ${verificationCode}\n\nEste código expira em 3 minutos.`,
         reply_to: { 
-          email: 'contact@genoi.net', 
+          email: 'noreply@genoi.com.br', 
           name: 'Gen.OI - Suporte' 
         },
         tags: ['auth', 'login-code'],
@@ -217,7 +217,27 @@ const PersonalizedLogin = () => {
       };
 
       console.log('Enviando email com código de login:', { email: userData.email, code: verificationCode });
-      await addDoc(collection(db, 'emails'), emailPayload);
+      
+      // Usar o serviço de email com retry
+      const emailResult = await EmailService.sendEmail(EmailService.createStandardPayload(
+        { email: userData.email, name: userData.email.split('@')[0] },
+        `Código de Login Gen.OI: ${verificationCode}`,
+        emailHtml,
+        `Seu código de login Gen.OI: ${verificationCode}\n\nEste código expira em 3 minutos.`,
+        ['auth', 'login-code'],
+        { 
+          userId: userData.uid,
+          verificationCode,
+          loginSlug: loginSlug!,
+          loginAttempt: true
+        }
+      ));
+
+      if (!emailResult.success) {
+        throw new Error(`Falha no envio do email: ${emailResult.error}`);
+      }
+
+      console.log('✅ Email de login enviado com sucesso:', emailResult.docId);
 
       setCodeSent(true);
       setCountdown(180); // 3 minutos

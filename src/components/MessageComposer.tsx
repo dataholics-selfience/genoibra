@@ -351,14 +351,14 @@ const MessageComposer = () => {
             name: selectedContact.name 
           }],
           from: { 
-            email: 'contact@genoi.com.br', 
+            email: 'noreply@genoi.com.br', 
             name: 'Gen.OI - Inovação Aberta' 
           },
           subject: subject.trim(),
           html: emailHtml,
           text: finalMessage,
           reply_to: { 
-            email: 'contact@genoi.net', 
+            email: 'noreply@genoi.com.br', 
             name: 'Gen.OI - Suporte' 
           },
           tags: ['crm', 'startup-interaction'],
@@ -372,8 +372,15 @@ const MessageComposer = () => {
 
         console.log('Sending email via MailerSend extension:', emailPayload);
 
-        await addDoc(collection(db, 'emails'), emailPayload);
-        success = true;
+        // Usar o serviço de email com retry
+        const emailResult = await EmailService.sendEmail(emailPayload);
+        
+        if (emailResult.success) {
+          console.log('✅ Email enviado com sucesso via EmailService:', emailResult.docId);
+          success = true;
+        } else {
+          throw new Error(`Falha no envio do email: ${emailResult.error}`);
+        }
       }
 
       if (success) {

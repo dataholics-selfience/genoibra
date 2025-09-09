@@ -31,14 +31,14 @@ Durante a instalação, você será solicitado a configurar os seguintes parâme
 
 - **MAILERSEND_API_KEY**: `mlsn.sua_api_key_aqui`
 - **EMAIL_COLLECTION**: `emails`
-- **DEFAULT_FROM_EMAIL**: `noreply@genoi.net`
+- **DEFAULT_FROM_EMAIL**: `noreply@genoi.com.br`
 - **DEFAULT_FROM_NAME**: `Gen.OI - Inovação Aberta`
 
 ### 3. Configurar domínio no MailerSend
 
 1. Acesse o [painel do MailerSend](https://app.mailersend.com/)
 2. Vá em **Domains** > **Add Domain**
-3. Adicione o domínio `genoi.net`
+3. Adicione o domínio `genoi.com.br`
 4. Configure os registros DNS conforme instruído:
    - **TXT** para verificação
    - **CNAME** para DKIM
@@ -64,11 +64,11 @@ Durante a instalação, você será solicitado a configurar os seguintes parâme
 ```javascript
 {
   to: [{ email: 'destinatario@exemplo.com', name: 'Nome' }],
-  from: { email: 'noreply@genoi.net', name: 'Gen.OI' },
+  from: { email: 'noreply@genoi.com.br', name: 'Gen.OI' },
   subject: 'Assunto do email',
   html: 'Conteúdo HTML formatado',
   text: 'Conteúdo em texto simples',
-  reply_to: { email: 'contact@genoi.net', name: 'Gen.OI - Suporte' },
+  reply_to: { email: 'noreply@genoi.com.br', name: 'Gen.OI - Suporte' },
   tags: ['crm', 'startup-interaction'],
   metadata: { startupId: 'xxx', userId: 'xxx' }
 }
