@@ -4,6 +4,7 @@ import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { auth, db } from './firebase';
 import { doc, getDoc } from 'firebase/firestore';
 import { initializeLanguage } from './utils/i18n';
+import IPAccessGuard from './components/IPAccessGuard';
 import Layout from './components/Layout';
 import Login from './components/auth/Login';
 import Register from './components/auth/Register';
@@ -108,6 +109,7 @@ function App() {
     );
   }
   return (
+    <IPAccessGuard>
     <Router>
       <Routes>
         {/* Authentication Routes */}
@@ -161,6 +163,7 @@ function App() {
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Router>
+    </IPAccessGuard>
   );
 }
 

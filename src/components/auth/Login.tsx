@@ -3,10 +3,13 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '../../firebase';
 import { useTranslation } from '../../utils/i18n';
+import { useIPVerification } from '../../hooks/useIPVerification';
+import AccessDenied from '../AccessDenied';
 
 const Login = () => {
   const { t } = useTranslation();
   const location = useLocation();
+  const { isVerifying, isAllowed, verificationResult } = useIPVerification();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -105,6 +108,31 @@ const Login = () => {
       setIsLoading(false);
     }
   };
+
+  // Show IP verification loading
+  if (isVerifying) {
+    return (
+      <div className="min-h-screen bg-black flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin mx-auto w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full mb-4" />
+          <h2 className="text-xl font-bold text-white mb-2">Verificando Acesso</h2>
+          <p className="text-gray-400">Validando permissões de segurança...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show access denied if IP is not allowed
+  if (isAllowed === false && verificationResult) {
+    return (
+      <AccessDenied
+        reason={verificationResult.reason}
+        clientIP={verificationResult.clientIP}
+        ipType={verificationResult.ipType}
+        message={verificationResult.message}
+      />
+    );
+  }
 
   return (
     <div className="min-h-screen bg-black flex items-center justify-center p-4">

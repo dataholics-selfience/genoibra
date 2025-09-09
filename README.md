@@ -119,3 +119,119 @@ firebase deploy --project=genoibra-5ed82
 1. Confirme os registros DNS no seu provedor
 2. Aguarde a propagação (pode levar até 24h)
 3. Use a ferramenta de verificação do MailerSend
+
+## 🔒 Sistema de Controle de Acesso por IP
+
+### Visão Geral
+A plataforma possui um sistema robusto de controle de acesso baseado em endereços IP, garantindo que apenas usuários autorizados possam acessar o sistema.
+
+### Como Funciona
+
+#### 1. Verificação Automática
+- **Momento**: A cada login e acesso ao painel administrativo
+- **Método**: Netlify Function segura (`/.netlify/functions/verify-ip`)
+- **Suporte**: IPv4 e IPv6 completos
+- **Headers verificados**: `x-forwarded-for`, `x-real-ip`, `x-nf-client-connection-ip`
+
+#### 2. Armazenamento Seguro
+- **Collection Firebase**: `allowedIPs`
+- **Campos**:
+  - `ip`: Endereço IP (IPv4 ou IPv6)
+  - `description`: Descrição do IP (ex: "Escritório principal")
+  - `addedBy`: Email do administrador que adicionou
+  - `addedAt`: Timestamp de criação
+  - `type`: "ipv4" ou "ipv6"
+  - `active`: Status ativo/inativo
+
+#### 3. Configuração de Acesso Público
+- **Collection**: `systemConfig/publicAccess`
+- **Função**: Desabilita temporariamente todas as restrições de IP
+- **Uso**: Para manutenção ou acesso emergencial
+
+### Gerenciamento via Interface
+
+#### Acesso ao Painel
+1. Login como Sudo Admin (`daniel.mendes@dataholics.io`)
+2. Navegar para `/sudo-admin`
+3. Selecionar aba "Controle de IP"
+
+#### Funcionalidades Disponíveis
+- ✅ **Visualizar IP atual** do administrador
+- ✅ **Adicionar IPs** com validação automática de formato
+- ✅ **Remover IPs** com confirmação de segurança
+- ✅ **Toggle de Acesso Público** para emergências
+- ✅ **Detecção automática** de IPv4 e IPv6
+- ✅ **Validação em tempo real** de formatos
+
+### Exemplos de IPs Válidos
+
+#### IPv4
+```
+192.168.1.1      # Rede local
+203.0.113.1      # IP público
+127.0.0.1        # Localhost
+10.0.0.1         # Rede privada
+```
+
+#### IPv6
+```
+2001:db8::1      # IPv6 padrão
+::1              # IPv6 localhost
+fe80::1          # Link-local
+2001:db8:85a3::8a2e:370:7334  # IPv6 completo
+```
+
+### Fluxo de Segurança
+
+1. **Usuário tenta acessar** → Netlify Function extrai IP real
+2. **Verificação no Firebase** → Busca IP na collection `allowedIPs`
+3. **Decisão de acesso**:
+   - ✅ **IP autorizado** → Acesso liberado
+   - ❌ **IP não autorizado** → Página de acesso negado
+   - 🌍 **Acesso público ativo** → Bypass das restrições
+
+### Logs e Auditoria
+- Todas as tentativas de acesso são logadas
+- IPs bloqueados são registrados com timestamp
+- Alterações na configuração são auditadas
+- Logs disponíveis no console do Netlify Functions
+
+### Configuração de Emergência
+
+#### Habilitar Acesso Público Temporário
+1. Acessar painel Sudo Admin
+2. Ativar toggle "Acesso Público"
+3. Sistema permite qualquer IP temporariamente
+4. Desabilitar após resolver problema de acesso
+
+#### Recuperação de Acesso
+Se o administrador perder acesso:
+1. Usuário vê página de "Acesso Negado"
+2. Botão para contato via WhatsApp com dados do IP
+3. Administrador pode adicionar IP remotamente
+4. Ou ativar acesso público temporariamente
+
+### Segurança Implementada
+- 🔒 **Verificação server-side** via Netlify Functions
+- 🔒 **Não confia no front-end** para validação
+- 🔒 **Headers múltiplos** para detecção de IP real
+- 🔒 **Validação rigorosa** de formatos IPv4/IPv6
+- 🔒 **Logs completos** para auditoria
+- 🔒 **Fallback seguro** em caso de erro (nega acesso)
+
+### Troubleshooting
+
+#### IP não detectado
+- Verificar configuração do Netlify
+- Confirmar headers de proxy
+- Testar em ambiente de produção
+
+#### Formato inválido
+- Usar validador de IP online
+- Verificar se é IPv4 ou IPv6 válido
+- Remover espaços e caracteres especiais
+
+#### Acesso negado inesperado
+- Verificar se IP mudou (conexões dinâmicas)
+- Confirmar se acesso público está desabilitado
+- Verificar logs da Netlify Function

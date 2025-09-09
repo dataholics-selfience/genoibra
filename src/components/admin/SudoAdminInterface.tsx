@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
-  ArrowLeft, Plus, Trash2, Shield, 
+  ArrowLeft, Plus, Trash2, Shield, Settings, Globe,
   CheckCircle, AlertTriangle, QrCode, Copy, Clock, Mail, Users
 } from 'lucide-react';
 import { 
@@ -17,6 +17,7 @@ import {
 import { auth, db } from '../../firebase';
 import QRCode from 'qrcode';
 import { EmailService } from '../../utils/emailService';
+import IPManagement from './IPManagement';
 
 interface RegistrationToken {
   id: string;
@@ -32,6 +33,7 @@ interface RegistrationToken {
 
 const SudoAdminInterface = () => {
   const navigate = useNavigate();
+  const [activeTab, setActiveTab] = useState<'tokens' | 'ip-management'>('tokens');
   const [registrationTokens, setRegistrationTokens] = useState<RegistrationToken[]>([]);
   const [newEmail, setNewEmail] = useState('');
   const [loading, setLoading] = useState(false);
@@ -387,7 +389,7 @@ const SudoAdminInterface = () => {
             <div className="flex items-center gap-3">
               <Shield size={24} className="text-purple-500" />
               <h1 className="text-2xl font-bold text-white">Sudo Admin</h1>
-              <span className="text-sm text-gray-400">- Gerenciamento de Acesso com QR Code</span>
+              <span className="text-sm text-gray-400">- Gerenciamento Avançado</span>
             </div>
           </div>
           
@@ -398,6 +400,39 @@ const SudoAdminInterface = () => {
       </div>
 
       <div className="max-w-4xl mx-auto p-6">
+        {/* Tab Navigation */}
+        <div className="bg-gray-800 rounded-lg mb-8">
+          <div className="flex border-b border-gray-700">
+            <button
+              onClick={() => setActiveTab('tokens')}
+              className={`flex items-center gap-2 px-6 py-4 font-medium transition-colors ${
+                activeTab === 'tokens'
+                  ? 'text-white border-b-2 border-purple-500 bg-gray-700'
+                  : 'text-gray-400 hover:text-white hover:bg-gray-700'
+              }`}
+            >
+              <QrCode size={20} />
+              Tokens de Registro
+            </button>
+            <button
+              onClick={() => setActiveTab('ip-management')}
+              className={`flex items-center gap-2 px-6 py-4 font-medium transition-colors ${
+                activeTab === 'ip-management'
+                  ? 'text-white border-b-2 border-purple-500 bg-gray-700'
+                  : 'text-gray-400 hover:text-white hover:bg-gray-700'
+              }`}
+            >
+              <Globe size={20} />
+              Controle de IP
+            </button>
+          </div>
+        </div>
+
+        {/* Tab Content */}
+        {activeTab === 'ip-management' ? (
+          <IPManagement />
+        ) : (
+          <>
         {/* Add Email Form */}
         <div className="bg-gray-800 rounded-lg p-6 mb-8">
           <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
@@ -576,6 +611,9 @@ const SudoAdminInterface = () => {
             <li>• Sistema previne fraudes e garante controle total de acesso</li>
           </ul>
         </div>
+
+          </>
+        )}
 
         {/* QR Code Modal */}
         {showQRModal && (
