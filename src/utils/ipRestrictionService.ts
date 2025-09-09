@@ -38,16 +38,6 @@ export class IPRestrictionService {
     try {
       console.log('🔍 Verificando IP atual via Netlify Function...');
       
-      // In development, skip IP verification if Netlify Functions are not available
-      if (import.meta.env.DEV) {
-        console.warn('⚠️ Desenvolvimento: Verificação de IP desabilitada');
-        return {
-          allowed: true,
-          ip: 'localhost',
-          reason: 'Desenvolvimento local'
-        };
-      }
-
       const response = await fetch('/.netlify/functions/verify-ip', {
         method: 'POST',
         headers: {
@@ -56,6 +46,17 @@ export class IPRestrictionService {
       });
 
       if (!response.ok) {
+        // In development, if function is not available, allow access
+        if (import.meta.env.DEV && response.status === 404) {
+          console.warn('⚠️ Desenvolvimento: Netlify Function não disponível, permitindo acesso');
+          return {
+            allowed: true,
+            reason: 'DEVELOPMENT_MODE',
+            clientIP: 'localhost',
+            message: 'Desenvolvimento local - verificação de IP desabilitada'
+          };
+        }
+        
         const errorData = await response.json().catch(() => ({}));
         console.error('❌ Erro na verificação de IP:', response.status, errorData);
         
