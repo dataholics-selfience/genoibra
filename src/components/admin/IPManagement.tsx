@@ -123,7 +123,7 @@ const IPManagement = () => {
     console.log(`🗑️ Tentando remover IP: ${ipAddress} (ID: ${ipId})`);
     
     const confirmed = window.confirm(
-      `Tem certeza que deseja remover o IP "${ipAddress}" da lista de permitidos?\n\nAtenção: Se este for seu IP atual, você perderá acesso à plataforma!`
+      `Tem certeza que deseja remover o IP "${ipAddress}" da lista de permitidos?\n\nAtenção: Se este for seu IP atual, você perderá acesso à plataforma!\n\nApós a remoção, aguarde 30 segundos antes de testar o acesso.`
     );
 
     if (!confirmed) return;
@@ -137,14 +137,14 @@ const IPManagement = () => {
       if (result.success) {
         console.log(`✅ IP removido com sucesso do Firebase`);
         setAllowedIPs(prev => prev.filter(ip => ip.id !== ipId));
-        setSuccess('IP removido com sucesso!');
+        setSuccess('IP removido com sucesso! Aguarde 30 segundos para que a mudança seja aplicada.');
         setTimeout(() => setSuccess(''), 3000);
         
-        // Forçar reload da lista para garantir sincronização
-        console.log(`🔄 Recarregando lista de IPs para confirmar exclusão...`);
+        // Aguardar mais tempo e recarregar para confirmar exclusão
+        console.log(`🔄 Aguardando 5 segundos e recarregando lista para confirmar exclusão...`);
         setTimeout(() => {
           loadData();
-        }, 2000);
+        }, 5000);
       } else {
         console.error(`❌ Falha na remoção:`, result.error);
         setError(result.error || 'Erro ao remover IP');
@@ -554,6 +554,45 @@ const IPManagement = () => {
             <p>• IPs IPv6 são normalizados automaticamente para comparação</p>
             <p>• Use o botão "Adicionar" ao lado do seu IP atual para garantir formato correto</p>
             <p>• <strong>Debug:</strong> Verifique se os IPs aparecem nos logs como "carregados do Firebase"</p>
+          </div>
+        </div>
+        
+        <div className="mt-4 pt-4 border-t border-blue-700">
+          <div className="bg-blue-900/20 border border-blue-600 rounded-lg p-4">
+            <div className="flex items-center gap-2 mb-2">
+              <Lock size={16} className="text-blue-400" />
+              <span className="text-blue-200 font-medium text-sm">Segurança</span>
+            </div>
+            <p className="text-blue-100 text-xs leading-relaxed">
+              Esta plataforma possui controle de acesso por IP para garantir a segurança dos dados. 
+              Apenas endereços IP autorizados podem acessar o sistema. Mudanças podem levar até 30 segundos para serem aplicadas.
+            </p>
+          </div>
+          
+          {/* Botão de emergência para habilitar acesso público */}
+          <div className="mt-4">
+            <button
+              onClick={async () => {
+                const confirmed = window.confirm(
+                  'EMERGÊNCIA: Habilitar acesso público temporariamente?\n\nIsso permitirá que qualquer IP acesse a plataforma. Use apenas em caso de emergência!'
+                );
+                if (confirmed && auth.currentUser?.email) {
+                  try {
+                    await IPRestrictionService.updatePublicAccess(
+                      true,
+                      auth.currentUser.email,
+                      'Acesso público habilitado em emergência via interface'
+                    );
+                    window.location.reload();
+                  } catch (error) {
+                    console.error('Erro ao habilitar acesso público:', error);
+                  }
+                }
+              }}
+              className="w-full py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors text-sm"
+            >
+              🚨 EMERGÊNCIA: Habilitar Acesso Público
+            </button>
           </div>
         </div>
       </div>

@@ -4,9 +4,7 @@ const fetch = require('node-fetch');
 const FIREBASE_CONFIG = {
   projectId: 'genoibra-5ed82',
   apiKey: 'AIzaSyAVeS0OmVlGd4_RV5b1xnJ1aAUPt8rbt1M',
-  authDomain: 'genoibra-5ed82.firebaseapp.com',
-  databaseURL: `https://genoibra-5ed82-default-rtdb.firebaseio.com`,
-  firestoreUrl: `https://firestore.googleapis.com/v1/projects/genoibra-5ed82/databases/(default)/documents`
+  authDomain: 'genoibra-5ed82.firebaseapp.com'
 };
 
 // IPs hardcoded apenas para desenvolvimento local
@@ -40,7 +38,8 @@ function extractClientIP(event) {
     console.log(`  ${key}: ${value}`);
   });
 
-  const detectedIPs = [];
+  const detectedIPs = new Set(); // Usar Set para evitar duplicatas
+  const ipDetails = [];
 
   for (const header of ipHeaders) {
     const value = headers[header];
@@ -52,9 +51,12 @@ function extractClientIP(event) {
       
       for (const ip of ips) {
         const type = detectIPType(ip);
-        if (type !== 'invalid') {
-          detectedIPs.push({ ip, type, source: header });
+        if (type !== 'invalid' && !detectedIPs.has(ip)) {
+          detectedIPs.add(ip);
+          ipDetails.push({ ip, type, source: header });
           console.log(`  ✅ IP válido encontrado: ${ip} (${type}) via ${header}`);
+        } else if (detectedIPs.has(ip)) {
+          console.log(`  🔄 IP duplicado ignorado: ${ip} via ${header}`);
         } else {
           console.log(`  ❌ IP inválido ignorado: ${ip} via ${header}`);
         }
@@ -64,20 +66,21 @@ function extractClientIP(event) {
 
   // Fallback para IP do evento (menos confiável)
   const eventIP = event.ip || event.clientIP;
-  if (eventIP) {
+  if (eventIP && !detectedIPs.has(eventIP)) {
     const type = detectIPType(eventIP);
     if (type !== 'invalid') {
-      detectedIPs.push({ ip: eventIP, type, source: 'event' });
+      detectedIPs.add(eventIP);
+      ipDetails.push({ ip: eventIP, type, source: 'event' });
       console.log(`⚠️ IP do evento (fallback): ${eventIP} (${type})`);
     }
   }
 
-  console.log(`🎯 TOTAL DE IPs DETECTADOS: ${detectedIPs.length}`);
-  detectedIPs.forEach((ipData, index) => {
+  console.log(`🎯 TOTAL DE IPs ÚNICOS DETECTADOS: ${ipDetails.length}`);
+  ipDetails.forEach((ipData, index) => {
     console.log(`  ${index + 1}. ${ipData.ip} (${ipData.type}) - fonte: ${ipData.source}`);
   });
 
-  return detectedIPs;
+  return ipDetails;
 }
 
 /**
@@ -219,7 +222,7 @@ function isHardcodedIP(clientIPs) {
 /**
  * Busca IPs permitidos usando REST API do Firebase
  */
-async function getFirebaseAllowedIPs(event) {
+async function getFirebaseAllowedIPs() {
   const maxRetries = 3;
   let lastError;
 
@@ -227,10 +230,10 @@ async function getFirebaseAllowedIPs(event) {
     try {
       console.log(`🔍 Tentativa ${attempt}/${maxRetries} - Buscando IPs via REST API (${new Date().toISOString()})...`);
       
-      // Usar REST API do Firestore em vez do Admin SDK
-      // Adicionar timestamp para evitar cache
+      // Usar REST API do Firestore com query correta
       const timestamp = Date.now();
-      const url = `${FIREBASE_CONFIG.firestoreUrl}/allowedIPs?key=${FIREBASE_CONFIG.apiKey}&_t=${timestamp}`;
+      const baseUrl = `https://firestore.googleapis.com/v1/projects/${FIREBASE_CONFIG.projectId}/databases/(default)/documents`;
+      const url = `${baseUrl}/allowedIPs?key=${FIREBASE_CONFIG.apiKey}&_t=${timestamp}`;
       
       console.log(`🌐 Fazendo requisição para: ${url}`);
       
@@ -244,15 +247,18 @@ async function getFirebaseAllowedIPs(event) {
         }
       });
 
+      console.log(`📊 Status da resposta: ${response.status} ${response.statusText}`);
+
       if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        const errorText = await response.text();
+        console.error(`❌ Erro HTTP ${response.status}:`, errorText);
+        throw new Error(`HTTP ${response.status}: ${response.statusText} - ${errorText}`);
       }
 
       const data = await response.json();
       console.log(`📊 Resposta da REST API recebida. Status: ${response.status}`);
-      console.log(`📊 Dados brutos recebidos:`, JSON.stringify(data, null, 2));
       
-      if (!data.documents) {
+      if (!data.documents || !Array.isArray(data.documents)) {
         console.log(`📄 Nenhum documento encontrado na coleção allowedIPs`);
         return [];
       }
@@ -297,14 +303,6 @@ async function getFirebaseAllowedIPs(event) {
         console.log(`  ${index + 1}. ${ip}`);
       });
       
-      // Verificar se o IP do cliente está na lista (para debug)
-      const clientIPs = extractClientIP(event);
-      if (clientIPs.length > 0) {
-        const primaryIP = clientIPs[0].ip;
-        const isInList = ips.includes(primaryIP);
-        console.log(`🔍 IP do cliente (${primaryIP}) está na lista Firebase: ${isInList ? 'SIM' : 'NÃO'}`);
-      }
-      
       return ips;
       
     } catch (error) {
@@ -319,7 +317,89 @@ async function getFirebaseAllowedIPs(event) {
   }
 
   console.error(`💥 Todas as ${maxRetries} tentativas falharam. Último erro:`, lastError);
-  return [];
+  
+  // FALLBACK: Tentar buscar via método alternativo
+  console.log('🔄 TENTANDO MÉTODO ALTERNATIVO...');
+  try {
+    return await getFirebaseIPsAlternative();
+  } catch (fallbackError) {
+    console.error('❌ Método alternativo também falhou:', fallbackError);
+    return [];
+  }
+}
+
+/**
+ * Método alternativo para buscar IPs do Firebase usando query simples
+ */
+async function getFirebaseIPsAlternative() {
+  try {
+    console.log('🔄 Tentando método alternativo para buscar IPs...');
+    
+    // Usar endpoint de query mais simples
+    const baseUrl = `https://firestore.googleapis.com/v1/projects/${FIREBASE_CONFIG.projectId}/databases/(default)/documents`;
+    const url = `${baseUrl}:runQuery`;
+    
+    const queryPayload = {
+      structuredQuery: {
+        from: [{ collectionId: 'allowedIPs' }],
+        where: {
+          fieldFilter: {
+            field: { fieldPath: 'active' },
+            op: 'EQUAL',
+            value: { booleanValue: true }
+          }
+        }
+      }
+    };
+    
+    console.log(`🌐 Fazendo query alternativa para: ${url}`);
+    console.log(`📋 Payload:`, JSON.stringify(queryPayload, null, 2));
+    
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(queryPayload)
+    });
+
+    console.log(`📊 Status da query alternativa: ${response.status} ${response.statusText}`);
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`❌ Erro na query alternativa:`, errorText);
+      throw new Error(`Query failed: ${response.status} - ${errorText}`);
+    }
+
+    const data = await response.json();
+    console.log(`📊 Resposta da query alternativa recebida`);
+    
+    if (!data || !Array.isArray(data)) {
+      console.log(`📄 Resposta inválida da query alternativa`);
+      return [];
+    }
+
+    const ips = [];
+    data.forEach((item, index) => {
+      if (item.document && item.document.fields) {
+        const fields = item.document.fields;
+        const ip = fields.ip?.stringValue;
+        const active = fields.active?.booleanValue;
+        
+        if (ip && active !== false) {
+          ips.push(ip);
+          console.log(`  ✅ IP encontrado via query: ${ip}`);
+        }
+      }
+    });
+    
+    console.log(`✅ IPs carregados via método alternativo: ${ips.length}`);
+    return ips;
+    
+  } catch (error) {
+    console.error('❌ Método alternativo falhou:', error);
+    throw error;
+  }
 }
 
 /**
@@ -329,7 +409,8 @@ async function checkPublicAccess() {
   try {
     console.log('🌍 Verificando configuração de acesso público via REST API...');
     
-    const url = `${FIREBASE_CONFIG.firestoreUrl}/systemConfig/publicAccess?key=${FIREBASE_CONFIG.apiKey}`;
+    const baseUrl = `https://firestore.googleapis.com/v1/projects/${FIREBASE_CONFIG.projectId}/databases/(default)/documents`;
+    const url = `${baseUrl}/systemConfig/publicAccess?key=${FIREBASE_CONFIG.apiKey}`;
     console.log(`🌐 URL da requisição: ${url}`);
     
     const response = await fetch(url, {
@@ -339,17 +420,21 @@ async function checkPublicAccess() {
       }
     });
 
+    console.log(`📊 Status da configuração: ${response.status} ${response.statusText}`);
+
     if (response.status === 404) {
       console.log('🌍 Documento de configuração não existe - acesso público DESABILITADO');
       return { enabled: false };
     }
 
     if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      const errorText = await response.text();
+      console.error(`❌ Erro ao buscar configuração:`, errorText);
+      return { enabled: false };
     }
 
     const data = await response.json();
-    console.log('📊 Resposta da configuração recebida:', data);
+    console.log('📊 Resposta da configuração recebida:', JSON.stringify(data, null, 2));
     
     if (!data.fields) {
       console.log('🌍 Documento sem campos - acesso público DESABILITADO');
@@ -372,7 +457,7 @@ async function checkPublicAccess() {
     
     return config;
   } catch (error) {
-    console.error('❌ Erro ao verificar acesso público via REST API:', error);
+    console.error('❌ Erro ao verificar acesso público:', error);
     return { enabled: false };
   }
 }
@@ -382,11 +467,11 @@ async function checkPublicAccess() {
  */
 exports.handler = async (event, context) => {
   const startTime = Date.now();
-  console.log('🚀 ===== INICIANDO VERIFICAÇÃO DE IP (REST API) =====');
+  console.log('🚀 ===== INICIANDO VERIFICAÇÃO DE IP (VERSÃO CORRIGIDA) =====');
   console.log(`⏰ Timestamp: ${new Date().toISOString()}`);
   console.log(`🌐 Método: ${event.httpMethod}`);
   console.log(`📍 URL: ${event.path}`);
-  console.log(`🔧 Usando Firebase REST API em vez do Admin SDK`);
+  console.log(`🔧 Usando Firebase REST API com fallbacks`);
   
   // Configurar CORS
   const corsHeaders = {
@@ -406,8 +491,8 @@ exports.handler = async (event, context) => {
   }
 
   try {
-    // 1. DETECTAR IPs DO CLIENTE
-    console.log('\n🔍 ETAPA 1: DETECÇÃO DE IPs DO CLIENTE');
+    // 1. DETECTAR IPs DO CLIENTE (SEM DUPLICATAS)
+    console.log('\n🔍 ETAPA 1: DETECÇÃO DE IPs DO CLIENTE (ÚNICOS)');
     const allClientIPs = extractClientIP(event);
     
     if (allClientIPs.length === 0) {
@@ -434,7 +519,7 @@ exports.handler = async (event, context) => {
     const allIPs = allClientIPs.map(ipData => ipData.ip);
 
     console.log(`🎯 IP PRINCIPAL: ${primaryClientIP} (${ipType})`);
-    console.log(`📋 TODOS OS IPs: ${allIPs.join(', ')}`);
+    console.log(`📋 TODOS OS IPs ÚNICOS: ${allIPs.join(', ')}`);
 
     // 2. VERIFICAR ACESSO PÚBLICO
     console.log('\n🌍 ETAPA 2: VERIFICAÇÃO DE ACESSO PÚBLICO');
@@ -495,6 +580,29 @@ exports.handler = async (event, context) => {
     firebaseIPs.forEach((ip, index) => {
       console.log(`  ${index + 1}. ${ip}`);
     });
+    
+    // VERIFICAÇÃO CRÍTICA: Se não carregou IPs do Firebase, NEGAR ACESSO
+    if (firebaseIPs.length === 0) {
+      console.log('🚨 CRÍTICO: Nenhum IP carregado do Firebase - NEGANDO ACESSO POR SEGURANÇA');
+      const duration = Date.now() - startTime;
+      return {
+        statusCode: 200,
+        headers: corsHeaders,
+        body: JSON.stringify({
+          allowed: false,
+          reason: 'FIREBASE_CONNECTION_FAILED',
+          clientIP: primaryClientIP,
+          ipType,
+          allDetectedIPs: allIPs,
+          message: 'Falha na conexão com Firebase - acesso negado por segurança',
+          debug: {
+            duration: `${duration}ms`,
+            firebaseError: 'Could not load IPs from Firebase',
+            method: 'rest_api_failed'
+          }
+        })
+      };
+    }
     
     let foundInFirebase = false;
     let matchedFirebaseIP = null;
@@ -593,11 +701,11 @@ exports.handler = async (event, context) => {
         message: 'Seu endereço IP não está autorizado a acessar esta plataforma',
         debug: {
           duration: `${duration}ms`,
-          totalComparisons: allClientIPs.length * (HARDCODED_IPS.length + firebaseIPs.length),
+          totalComparisons: allClientIPs.length * (HARDCODED_IPs.length + firebaseIPs.length),
           firebaseConnection: firebaseIPs.length > 0 ? 'success' : 'failed',
           detectedIPsDetails: allClientIPs,
           method: 'rest_api',
-          firebaseUrl: FIREBASE_CONFIG.firestoreUrl
+          firebaseUrl: `https://firestore.googleapis.com/v1/projects/${FIREBASE_CONFIG.projectId}`
         }
       })
     };
