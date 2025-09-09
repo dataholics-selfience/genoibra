@@ -45,7 +45,15 @@ const IPManagement = () => {
     try {
       console.log('🔍 Detectando IP atual do administrador...');
       const result = await IPRestrictionService.verifyCurrentIP();
-      console.log('📊 Resultado da detecção:', result);
+      console.log('📊 Resultado completo da detecção:', {
+        allowed: result.allowed,
+        reason: result.reason,
+        clientIP: result.clientIP,
+        ipType: result.ipType,
+        allDetectedIPs: result.allDetectedIPs,
+        availableFirebaseIPs: result.availableFirebaseIPs,
+        debug: result.debug
+      });
       
       if (result.allDetectedIPs && result.allDetectedIPs.length > 0) {
         setCurrentUserIPs(result.allDetectedIPs);
@@ -54,7 +62,7 @@ const IPManagement = () => {
         setCurrentUserIPs([result.clientIP]);
         console.log(`✅ IP principal detectado: ${result.clientIP}`);
       } else {
-        console.log('⚠️ Nenhum IP detectado');
+        console.log('⚠️ Nenhum IP detectado - verificar logs da Netlify Function');
       }
     } catch (error) {
       console.error('Erro ao detectar IP atual:', error);
@@ -527,10 +535,12 @@ const IPManagement = () => {
         <div className="mt-4 pt-4 border-t border-blue-700">
           <h5 className="text-blue-200 font-medium mb-2">🛠️ Troubleshooting</h5>
           <div className="text-blue-100 text-xs space-y-1">
-            <p>• Se o IP não funciona após adicionar, verifique os logs da Netlify Function</p>
-            <p>• Certifique-se de que o Firebase está conectado corretamente</p>
+            <p>• <strong>Logs da Netlify:</strong> Vá em Netlify Dashboard → Functions → verify-ip → View logs</p>
+            <p>• <strong>Console do navegador:</strong> Abra DevTools (F12) para ver logs detalhados</p>
+            <p>• <strong>Firebase REST API:</strong> Agora usa REST API em vez do Admin SDK</p>
             <p>• IPs IPv6 são normalizados automaticamente para comparação</p>
             <p>• Use o botão "Adicionar" ao lado do seu IP atual para garantir formato correto</p>
+            <p>• <strong>Debug:</strong> Verifique se os IPs aparecem nos logs como "carregados do Firebase"</p>
           </div>
         </div>
       </div>
