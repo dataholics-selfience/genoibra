@@ -3,7 +3,6 @@ import { Plus, X, FolderClosed, FolderOpen, Rocket, BarChart3, Trash2, Shield } 
 import { signOut } from 'firebase/auth';
 import { Link, useNavigate } from 'react-router-dom';
 import { auth, db } from '../firebase';
-import { clearVerificationState } from '../utils/verificationStateManager';
 import { doc, getDoc, collection, query, where, getDocs, deleteDoc } from 'firebase/firestore';
 import UserProfile from './UserProfile';
 import LanguageSelector from './LanguageSelector';
@@ -79,8 +78,9 @@ const Sidebar = ({ isOpen, toggleSidebar, challenges, currentChallengeId, onSele
 
   const handleLogout = async () => {
     try {
-      // Clear verification state on logout
+      // Clear verification state before logout
       if (auth.currentUser) {
+        const { clearVerificationState } = await import('../utils/verificationStateManager');
         clearVerificationState(auth.currentUser.uid);
       }
       await signOut(auth);

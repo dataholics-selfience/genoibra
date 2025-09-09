@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { needsLoginVerification } from '../utils/verificationStateManager';
 import { ArrowLeft, Loader2, Upload, X, Copy, Check, Globe, ExternalLink } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import { doc, getDoc, addDoc, collection, updateDoc } from 'firebase/firestore';
@@ -12,6 +13,32 @@ const STARTUP_LIST_TOKEN_COST = 30;
 
 const NewChallenge = () => {
   const { t } = useTranslation();
+  const navigate = useNavigate();
+
+  // Check login verification status
+  useEffect(() => {
+    const checkVerificationStatus = async () => {
+      if (!auth.currentUser) {
+        navigate('/login');
+        return;
+      }
+
+      try {
+        const needsVerification = await needsLoginVerification(auth.currentUser.uid);
+        if (needsVerification) {
+          navigate('/verify-login', { replace: true });
+          return;
+        }
+      } catch (error) {
+        console.error('Error checking verification status:', error);
+        navigate('/verify-login', { replace: true });
+        return;
+      }
+    };
+
+    checkVerificationStatus();
+  }, [navigate]);
+
   const [webhookEnvironment, setWebhookEnvironment] = useState<'production' | 'test'>('production');
   const [formData, setFormData] = useState({
     title: '',
@@ -23,7 +50,6 @@ const NewChallenge = () => {
   });
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const navigate = useNavigate();
 
   useEffect(() => {
     // Load saved environment from localStorage

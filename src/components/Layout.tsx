@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
 import { collection, query, orderBy, onSnapshot, addDoc, where, getDocs } from 'firebase/firestore';
 import { db, auth } from '../firebase';
+import { useNavigate } from 'react-router-dom';
 import EnvironmentSelector from './EnvironmentSelector';
 import Sidebar from './Sidebar';
 import ChatInterface from './ChatInterface';
 import { MessageType, ChallengeType } from '../types';
+import { needsLoginVerification } from '../utils/verificationStateManager';
 
 const welcomeMessages = [
   "Olá. Eu sou a Genie, sua agente de inovação aberta turbinada por IA! Crie agora um novo desafio e irei pesquisar em uma base de milhares de startups globais!",
@@ -15,6 +17,7 @@ const welcomeMessages = [
 ];
 
 const Layout = () => {
+  const navigate = useNavigate();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [webhookEnvironment, setWebhookEnvironment] = useState<'production' | 'test'>('production');
   const [messages, setMessages] = useState<MessageType[]>([]);
@@ -22,6 +25,31 @@ const Layout = () => {
   const [currentChallengeId, setCurrentChallengeId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
+  // Check login verification status
+  useEffect(() => {
+    const checkVerificationStatus = async () => {
+      if (!auth.currentUser) {
+        navigate('/login');
+        return;
+      }
+
+      try {
+        const needsVerification = await needsLoginVerification(auth.currentUser.uid);
+        if (needsVerification) {
+          // User needs to verify login
+          navigate('/verify-login', { replace: true });
+          return;
+        }
+      } catch (error) {
+        console.error('Error checking verification status:', error);
+        // On error, redirect to verification to be safe
+        navigate('/verify-login', { replace: true });
+        return;
+      }
+    };
+
+    checkVerificationStatus();
+  }, [navigate]);
   useEffect(() => {
     if (!auth.currentUser) {
       setIsLoading(false);

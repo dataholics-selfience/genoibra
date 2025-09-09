@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { needsLoginVerification } from '../utils/verificationStateManager';
 import { 
   Star, Calendar, Building2, MapPin, Users, Briefcase, Award, 
   Target, Rocket, ArrowLeft, Globe, Box, Linkedin,
@@ -549,6 +550,31 @@ const StartupDetailCard = ({ startup }: { startup: StartupType }) => {
 
 const SavedStartups = () => {
   const navigate = useNavigate();
+
+  // Check login verification status
+  useEffect(() => {
+    const checkVerificationStatus = async () => {
+      if (!auth.currentUser) {
+        navigate('/login');
+        return;
+      }
+
+      try {
+        const needsVerification = await needsLoginVerification(auth.currentUser.uid);
+        if (needsVerification) {
+          navigate('/verify-login', { replace: true });
+          return;
+        }
+      } catch (error) {
+        console.error('Error checking verification status:', error);
+        navigate('/verify-login', { replace: true });
+        return;
+      }
+    };
+
+    checkVerificationStatus();
+  }, [navigate]);
+
   const [savedStartups, setSavedStartups] = useState<SavedStartupType[]>([]);
   const [selectedStartup, setSelectedStartup] = useState<StartupType | null>(null);
   const [loading, setLoading] = useState(true);

@@ -3,7 +3,6 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '../../firebase';
 import { useTranslation } from '../../utils/i18n';
-import { clearVerificationState } from '../../utils/verificationStateManager';
 
 const Login = () => {
   const { t } = useTranslation();
@@ -77,11 +76,9 @@ const Login = () => {
         throw new Error('No user data available');
       }
 
-      // Clear any existing verification state for fresh login
-      clearVerificationState(user.uid);
-
       setError('');
-      navigate('/', { replace: true });
+      // After successful login, redirect to verification page
+      navigate('/verify-login', { replace: true });
       
     } catch (error: any) {
       console.error('Login error:', error);
