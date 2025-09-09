@@ -129,6 +129,11 @@ const Login = () => {
         reason={verificationResult.reason}
         clientIP={verificationResult.clientIP}
         ipType={verificationResult.ipType}
+        allDetectedIPs={verificationResult.allDetectedIPs}
+        availableIPs={[
+          ...(verificationResult.availableHardcodedIPs || []),
+          ...(verificationResult.availableFirebaseIPs || [])
+        ]}
         message={verificationResult.message}
       />
     );

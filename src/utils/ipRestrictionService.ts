@@ -23,6 +23,10 @@ export interface IPVerificationResult {
   reason: string;
   clientIP?: string;
   ipType?: string;
+  allDetectedIPs?: string[];
+  matchedIP?: string;
+  availableHardcodedIPs?: string[];
+  availableFirebaseIPs?: string[];
   message: string;
 }
 
@@ -230,21 +234,35 @@ export class IPRestrictionService {
   /**
    * Detecta tipo de IP
    */
-  private static detectIPType(ip: string): 'ipv4' | 'ipv6' | 'invalid' {
-    // IPv4 pattern
-    const ipv4Pattern = /^(\d{1,3}\.){3}\d{1,3}$/;
-    // IPv6 pattern (simplified)
-    const ipv6Pattern = /^([0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}$|^::1$|^::$|^([0-9a-fA-F]{1,4}:){1,7}:$|^:([0-9a-fA-F]{1,4}:){1,7}$/;
+  static detectIPType(ip: string): 'ipv4' | 'ipv6' | 'invalid' {
+    if (!ip) return 'invalid';
     
-    if (ipv4Pattern.test(ip)) {
+    const cleanIP = ip.trim();
+    
+    // IPv4 pattern
+    const ipv4Pattern = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/;
+    const ipv4Match = cleanIP.match(ipv4Pattern);
+    
+    if (ipv4Match) {
       // Validar ranges IPv4
-      const parts = ip.split('.').map(Number);
+      const parts = ipv4Match.slice(1).map(Number);
       if (parts.every(part => part >= 0 && part <= 255)) {
         return 'ipv4';
       }
     }
     
-    if (ipv6Pattern.test(ip) || ip.includes('::')) {
+    // IPv6 patterns mais abrangentes
+    const ipv6Patterns = [
+      /^([0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}$/,  // Formato completo
+      /^::1$/,                                        // Localhost
+      /^::$/,                                         // All zeros
+      /^([0-9a-fA-F]{1,4}:){1,7}:$/,                // Com :: no final
+      /^:([0-9a-fA-F]{1,4}:){1,7}$/,                // Com :: no início
+      /^([0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}$/, // Com :: no meio
+      /^::ffff:\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/ // IPv4-mapped IPv6
+    ];
+    
+    if (ipv6Patterns.some(pattern => pattern.test(cleanIP)) || cleanIP.includes('::')) {
       return 'ipv6';
     }
     
@@ -266,7 +284,7 @@ export class IPRestrictionService {
     if (type === 'invalid') {
       return { 
         valid: false, 
-        error: 'Formato de IP inválido. Exemplos válidos:\n• IPv4: 192.168.1.1\n• IPv6: 2001:db8::1 ou ::1' 
+        error: 'Formato de IP inválido. Exemplos válidos:\n• IPv4: 192.168.1.1\n• IPv6: 2001:db8::1, ::1, ou ::ffff:192.168.1.1' 
       };
     }
 

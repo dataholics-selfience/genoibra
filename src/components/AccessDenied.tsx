@@ -5,6 +5,8 @@ interface AccessDeniedProps {
   reason?: string;
   clientIP?: string;
   ipType?: string;
+  allDetectedIPs?: string[];
+  availableIPs?: string[];
   message?: string;
 }
 
@@ -12,6 +14,8 @@ const AccessDenied = ({
   reason = 'IP_NOT_AUTHORIZED', 
   clientIP, 
   ipType, 
+  allDetectedIPs = [],
+  availableIPs = [],
   message = 'Seu endereço IP não está autorizado a acessar esta plataforma' 
 }: AccessDeniedProps) => {
   const navigate = useNavigate();
@@ -45,8 +49,12 @@ const AccessDenied = ({
   };
 
   const handleContactSupport = () => {
+    const allIPsText = allDetectedIPs.length > 0 
+      ? `\n\nTodos os IPs detectados:\n${allDetectedIPs.map((ip, i) => `${i + 1}. ${ip}`).join('\n')}`
+      : '';
+      
     const supportMessage = encodeURIComponent(
-      `Olá! Estou tentando acessar a plataforma Gen.OI mas meu IP não está autorizado.\n\nMeu IP: ${clientIP || 'Não detectado'}\nMotivo: ${getReasonMessage(reason)}\n\nPoderia me ajudar a liberar o acesso?`
+      `Olá! Estou tentando acessar a plataforma Gen.OI mas meu IP não está autorizado.\n\nIP Principal: ${clientIP || 'Não detectado'}\nMotivo: ${getReasonMessage(reason)}${allIPsText}\n\nPoderia me ajudar a liberar o acesso?`
     );
     const whatsappUrl = `https://wa.me/5511995736666?text=${supportMessage}`;
     window.open(whatsappUrl, '_blank');
@@ -78,12 +86,42 @@ const AccessDenied = ({
             <div className="bg-gray-900/50 border border-gray-700 rounded-lg p-4 mb-6">
               <div className="flex items-center justify-center gap-2 mb-2">
                 <Globe size={16} className="text-blue-400" />
-                <span className="text-blue-200 font-medium">Seu IP:</span>
+                <span className="text-blue-200 font-medium">IP Principal:</span>
               </div>
               <code className="text-white font-mono text-lg">{clientIP}</code>
               {ipType && (
                 <div className="text-xs text-gray-400 mt-1">
                   Tipo: {ipType.toUpperCase()}
+                </div>
+              )}
+              
+              {allDetectedIPs.length > 1 && (
+                <div className="mt-4 pt-4 border-t border-gray-600">
+                  <div className="text-blue-200 font-medium text-sm mb-2">
+                    Todos os IPs detectados ({allDetectedIPs.length}):
+                  </div>
+                  <div className="space-y-1">
+                    {allDetectedIPs.map((ip, index) => (
+                      <div key={index} className="text-xs text-gray-300 font-mono">
+                        {index + 1}. {ip}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              
+              {availableIPs && availableIPs.length > 0 && (
+                <div className="mt-4 pt-4 border-t border-gray-600">
+                  <div className="text-yellow-200 font-medium text-sm mb-2">
+                    IPs autorizados no sistema:
+                  </div>
+                  <div className="space-y-1 max-h-32 overflow-y-auto">
+                    {availableIPs.map((ip, index) => (
+                      <div key={index} className="text-xs text-gray-300 font-mono">
+                        {index + 1}. {ip}
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
             </div>

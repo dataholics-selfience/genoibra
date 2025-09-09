@@ -15,7 +15,7 @@ const IPManagement = () => {
   const [adding, setAdding] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
-  const [currentUserIP, setCurrentUserIP] = useState<string>('');
+  const [currentUserIPs, setCurrentUserIPs] = useState<string[]>([]);
   const [showCurrentIP, setShowCurrentIP] = useState(false);
 
   useEffect(() => {
@@ -44,8 +44,10 @@ const IPManagement = () => {
   const detectCurrentIP = async () => {
     try {
       const result = await IPRestrictionService.verifyCurrentIP();
-      if (result.clientIP) {
-        setCurrentUserIP(result.clientIP);
+      if (result.allDetectedIPs && result.allDetectedIPs.length > 0) {
+        setCurrentUserIPs(result.allDetectedIPs);
+      } else if (result.clientIP) {
+        setCurrentUserIPs([result.clientIP]);
       }
     } catch (error) {
       console.error('Erro ao detectar IP atual:', error);
@@ -162,10 +164,11 @@ const IPManagement = () => {
     }
   };
 
-  const addCurrentIP = () => {
-    if (currentUserIP) {
-      setNewIP(currentUserIP);
-      setNewDescription(`IP atual do administrador (${auth.currentUser?.email})`);
+  const addCurrentIP = (ip: string) => {
+    if (ip) {
+      setNewIP(ip);
+      const ipType = IPRestrictionService.validateIPFormat(ip).type || 'unknown';
+      setNewDescription(`IP atual do administrador (${auth.currentUser?.email}) - ${ipType.toUpperCase()}`);
     }
   };
 
@@ -279,25 +282,43 @@ const IPManagement = () => {
           </button>
         </div>
 
-        {showCurrentIP && currentUserIP && (
-          <div className="bg-gray-700 rounded-lg p-4 mb-4">
-            <div className="flex items-center justify-between">
-              <code className="text-white font-mono text-lg">{currentUserIP}</code>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => copyToClipboard(currentUserIP)}
-                  className="text-gray-400 hover:text-white p-1 rounded"
-                >
-                  <Copy size={16} />
-                </button>
-                <button
-                  onClick={addCurrentIP}
-                  className="text-blue-400 hover:text-blue-300 text-sm px-3 py-1 bg-blue-900/30 rounded"
-                >
-                  Adicionar à Lista
-                </button>
-              </div>
-            </div>
+        {showCurrentIP && currentUserIPs.length > 0 && (
+          <div className="space-y-3 mb-4">
+            {currentUserIPs.map((ip, index) => {
+              const ipType = IPRestrictionService.validateIPFormat(ip).type || 'unknown';
+              return (
+                <div key={index} className="bg-gray-700 rounded-lg p-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <code className="text-white font-mono text-lg">{ip}</code>
+                      <span className={`text-xs px-2 py-1 rounded-full ${
+                        ipType === 'ipv4' 
+                          ? 'bg-blue-600 text-blue-100' 
+                          : 'bg-purple-600 text-purple-100'
+                      }`}>
+                        {ipType.toUpperCase()}
+                      </span>
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => copyToClipboard(ip)}
+                        className="text-gray-400 hover:text-white p-1 rounded"
+                        title="Copiar IP"
+                      >
+                        <Copy size={16} />
+                      </button>
+                      <button
+                        onClick={() => addCurrentIP(ip)}
+                        className="text-blue-400 hover:text-blue-300 text-sm px-3 py-1 bg-blue-900/30 rounded"
+                        title="Adicionar à lista de permitidos"
+                      >
+                        Adicionar
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         )}
       </div>
@@ -405,7 +426,7 @@ const IPManagement = () => {
                       <div className="flex items-center gap-3 mb-1">
                         <code className="text-white font-mono text-lg">{ip.ip}</code>
                         {getIPTypeIcon(ip.type)}
-                        {ip.ip === currentUserIP && (
+                        {currentUserIPs.includes(ip.ip) && (
                           <span className="text-xs bg-green-600 text-green-100 px-2 py-1 rounded-full">
                             Seu IP
                           </span>

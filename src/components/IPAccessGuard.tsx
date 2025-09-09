@@ -7,7 +7,15 @@ interface IPAccessGuardProps {
   onAccessDenied?: () => void;
 }
 
-const AccessDeniedPage = ({ result }: { result: IPVerificationResult }) => {
+const AccessDeniedPage = ({ 
+  result, 
+  allDetectedIPs = [], 
+  availableIPs = [] 
+}: { 
+  result: IPVerificationResult;
+  allDetectedIPs?: string[];
+  availableIPs?: string[];
+}) => {
   const getReasonMessage = (reason: string) => {
     switch (reason) {
       case 'IP_NOT_DETECTED':
@@ -37,8 +45,12 @@ const AccessDeniedPage = ({ result }: { result: IPVerificationResult }) => {
   };
 
   const handleContactSupport = () => {
+    const allIPsText = allDetectedIPs.length > 0 
+      ? `\n\nTodos os IPs detectados:\n${allDetectedIPs.map((ip, i) => `${i + 1}. ${ip}`).join('\n')}`
+      : '';
+      
     const message = encodeURIComponent(
-      `Olá! Estou tentando acessar a plataforma Gen.OI mas meu IP não está autorizado.\n\nMeu IP: ${result.clientIP || 'Não detectado'}\nMotivo: ${getReasonMessage(result.reason)}\n\nPoderia me ajudar a liberar o acesso?`
+      `Olá! Estou tentando acessar a plataforma Gen.OI mas meu IP não está autorizado.\n\nIP Principal: ${result.clientIP || 'Não detectado'}\nMotivo: ${getReasonMessage(result.reason)}${allIPsText}\n\nPoderia me ajudar a liberar o acesso?`
     );
     const whatsappUrl = `https://wa.me/5511995736666?text=${message}`;
     window.open(whatsappUrl, '_blank');
@@ -62,12 +74,27 @@ const AccessDeniedPage = ({ result }: { result: IPVerificationResult }) => {
             <div className="bg-gray-900/50 border border-gray-700 rounded-lg p-4 mb-6">
               <div className="flex items-center justify-center gap-2 mb-2">
                 <Globe size={16} className="text-blue-400" />
-                <span className="text-blue-200 font-medium">Seu IP:</span>
+                <span className="text-blue-200 font-medium">IP Principal:</span>
               </div>
               <code className="text-white font-mono text-lg">{result.clientIP}</code>
               {result.ipType && (
                 <div className="text-xs text-gray-400 mt-1">
                   Tipo: {result.ipType.toUpperCase()}
+                </div>
+              )}
+              
+              {allDetectedIPs.length > 1 && (
+                <div className="mt-4 pt-4 border-t border-gray-600">
+                  <div className="text-blue-200 font-medium text-sm mb-2">
+                    Todos os IPs detectados ({allDetectedIPs.length}):
+                  </div>
+                  <div className="space-y-1">
+                    {allDetectedIPs.map((ip, index) => (
+                      <div key={index} className="text-xs text-gray-300 font-mono">
+                        {index + 1}. {ip}
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
             </div>
@@ -158,7 +185,16 @@ const IPAccessGuard = ({ children, onAccessDenied }: IPAccessGuardProps) => {
 
   // Access denied
   if (verificationResult && !verificationResult.allowed) {
-    return <AccessDeniedPage result={verificationResult} />;
+    return (
+      <AccessDeniedPage 
+        result={verificationResult}
+        allDetectedIPs={verificationResult.allDetectedIPs}
+        availableIPs={[
+          ...(verificationResult.availableHardcodedIPs || []),
+          ...(verificationResult.availableFirebaseIPs || [])
+        ]}
+      />
+    );
   }
 
   // Access granted
