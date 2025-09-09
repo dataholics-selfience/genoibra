@@ -110,10 +110,10 @@ const AccessDenied = ({
                 </div>
               )}
               
-              {availableIPs && availableIPs.length > 0 && (
+              {availableIPs && availableIPs.length > 0 && !publicAccess?.enabled && (
                 <div className="mt-4 pt-4 border-t border-gray-600">
                   <div className="text-yellow-200 font-medium text-sm mb-2">
-                    IPs autorizados no sistema:
+                    IPs autorizados no sistema ({availableIPs.length}):
                   </div>
                   <div className="space-y-1 max-h-32 overflow-y-auto">
                     {availableIPs.map((ip, index) => (
@@ -124,6 +124,22 @@ const AccessDenied = ({
                   </div>
                 </div>
               )}
+              
+              {/* Debug Information */}
+              <div className="mt-4 pt-4 border-t border-gray-600">
+                <details className="text-xs">
+                  <summary className="text-gray-400 cursor-pointer hover:text-gray-300">
+                    🔍 Informações de Debug (clique para expandir)
+                  </summary>
+                  <div className="mt-2 space-y-1 text-gray-400 font-mono">
+                    <p>Motivo: {reason}</p>
+                    <p>IP Principal: {clientIP}</p>
+                    <p>Tipo: {ipType}</p>
+                    <p>Total IPs detectados: {allDetectedIPs.length}</p>
+                    <p>IPs disponíveis: {availableIPs?.length || 0}</p>
+                  </div>
+                </details>
+              </div>
             </div>
           )}
 

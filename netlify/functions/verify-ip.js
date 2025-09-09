@@ -1,20 +1,45 @@
 const { initializeApp, cert } = require('firebase-admin/app');
 const { getFirestore } = require('firebase-admin/firestore');
 
-// Initialize Firebase Admin (will use environment variables in production)
+// Initialize Firebase Admin
 let adminApp;
 let db;
 
 try {
-  if (!adminApp) {
-    adminApp = initializeApp();
+  // Check if Firebase Admin is already initialized
+  const { getApps } = require('firebase-admin/app');
+  const existingApps = getApps();
+  
+  if (existingApps.length === 0) {
+    console.log('🔥 Inicializando Firebase Admin...');
+    
+    // Try to initialize with service account if available
+    if (process.env.FIREBASE_SERVICE_ACCOUNT_KEY) {
+      const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY);
+      adminApp = initializeApp({
+        credential: cert(serviceAccount),
+        projectId: 'genoibra-5ed82'
+      });
+    } else {
+      // Initialize with default credentials (works in Netlify with environment variables)
+      adminApp = initializeApp({
+        projectId: 'genoibra-5ed82'
+      });
+    }
+    
     db = getFirestore(adminApp);
+    console.log('✅ Firebase Admin inicializado com sucesso');
+  } else {
+    adminApp = existingApps[0];
+    db = getFirestore(adminApp);
+    console.log('✅ Firebase Admin já estava inicializado');
   }
 } catch (error) {
-  console.error('Firebase Admin initialization error:', error);
+  console.error('❌ Erro na inicialização do Firebase Admin:', error);
+  console.log('Environment variables available:', Object.keys(process.env).filter(key => key.includes('FIREBASE')));
 }
 
-// Hardcoded allowed IPs for immediate access (removidos conforme solicitado)
+// Hardcoded IPs apenas para desenvolvimento local
 const HARDCODED_IPS = [
   '127.0.0.1',
   '::1'
@@ -26,9 +51,9 @@ const HARDCODED_IPS = [
 function extractClientIP(event) {
   const headers = event.headers || {};
   
-  // Lista de headers em ordem de prioridade
+  // Lista de headers em ordem de prioridade para Netlify
   const ipHeaders = [
-    'x-nf-client-connection-ip',  // Netlify específico
+    'x-nf-client-connection-ip',  // Netlify específico - MAIS CONFIÁVEL
     'x-forwarded-for',           // Padrão para proxies
     'x-real-ip',                 // Nginx
     'x-client-ip',               // Apache
@@ -40,16 +65,29 @@ function extractClientIP(event) {
     'forwarded'                  // RFC 7239
   ];
 
-  console.log('📋 Headers disponíveis:', Object.keys(headers));
+  console.log('📋 TODOS OS HEADERS RECEBIDOS:');
+  Object.entries(headers).forEach(([key, value]) => {
+    console.log(`  ${key}: ${value}`);
+  });
+
+  const detectedIPs = [];
 
   for (const header of ipHeaders) {
     const value = headers[header];
     if (value) {
+      console.log(`🔍 Processando header ${header}: ${value}`);
+      
       // x-forwarded-for pode ter múltiplos IPs separados por vírgula
-      const ip = value.split(',')[0].trim();
-      if (ip && ip !== 'unknown') {
-        console.log(`✅ IP extraído do header ${header}: ${ip}`);
-        return ip;
+      const ips = value.split(',').map(ip => ip.trim()).filter(ip => ip && ip !== 'unknown');
+      
+      for (const ip of ips) {
+        const type = detectIPType(ip);
+        if (type !== 'invalid') {
+          detectedIPs.push({ ip, type, source: header });
+          console.log(`  ✅ IP válido encontrado: ${ip} (${type}) via ${header}`);
+        } else {
+          console.log(`  ❌ IP inválido ignorado: ${ip} via ${header}`);
+        }
       }
     }
   }
@@ -57,12 +95,19 @@ function extractClientIP(event) {
   // Fallback para IP do evento (menos confiável)
   const eventIP = event.ip || event.clientIP;
   if (eventIP) {
-    console.log(`⚠️ IP extraído do evento (fallback): ${eventIP}`);
-    return eventIP;
+    const type = detectIPType(eventIP);
+    if (type !== 'invalid') {
+      detectedIPs.push({ ip: eventIP, type, source: 'event' });
+      console.log(`⚠️ IP do evento (fallback): ${eventIP} (${type})`);
+    }
   }
 
-  console.log('❌ Não foi possível extrair IP do cliente');
-  return null;
+  console.log(`🎯 TOTAL DE IPs DETECTADOS: ${detectedIPs.length}`);
+  detectedIPs.forEach((ipData, index) => {
+    console.log(`  ${index + 1}. ${ipData.ip} (${ipData.type}) - fonte: ${ipData.source}`);
+  });
+
+  return detectedIPs;
 }
 
 /**
@@ -161,13 +206,14 @@ function compareIPs(clientIP, allowedIP) {
   
   // Se tipos diferentes, não podem ser iguais
   if (clientType !== allowedType) {
+    console.log(`❌ Tipos diferentes: ${clientType} vs ${allowedType}`);
     return false;
   }
   
   if (clientType === 'ipv4') {
     // Comparação direta para IPv4
     const match = clientIP.trim() === allowedIP.trim();
-    console.log(`IPv4 match: ${clientIP} === ${allowedIP} = ${match}`);
+    console.log(`IPv4 match: "${clientIP}" === "${allowedIP}" = ${match}`);
     return match;
   }
   
@@ -176,28 +222,32 @@ function compareIPs(clientIP, allowedIP) {
     const normalizedClient = normalizeIPv6(clientIP);
     const normalizedAllowed = normalizeIPv6(allowedIP);
     const match = normalizedClient === normalizedAllowed;
-    console.log(`IPv6 match: ${normalizedClient} === ${normalizedAllowed} = ${match}`);
+    console.log(`IPv6 match: "${normalizedClient}" === "${normalizedAllowed}" = ${match}`);
     return match;
   }
   
+  console.log(`❌ Tipo de IP inválido: ${clientType}`);
   return false;
 }
 
 /**
  * Verifica se IP está na lista hardcoded
  */
-function isHardcodedIP(clientIP) {
-  return HARDCODED_IPS.some(allowedIP => {
-    const match = compareIPs(clientIP, allowedIP);
-    if (match) {
-      console.log(`✅ IP hardcoded encontrado: ${clientIP} = ${allowedIP}`);
+function isHardcodedIP(clientIPs) {
+  for (const clientIPData of clientIPs) {
+    for (const allowedIP of HARDCODED_IPS) {
+      const match = compareIPs(clientIPData.ip, allowedIP);
+      if (match) {
+        console.log(`✅ IP hardcoded encontrado: ${clientIPData.ip} = ${allowedIP}`);
+        return true;
+      }
     }
-    return match;
-  });
+  }
+  return false;
 }
 
 /**
- * Busca IPs permitidos no Firebase
+ * Busca IPs permitidos no Firebase com retry e logs detalhados
  */
 async function getFirebaseAllowedIPs() {
   if (!db) {
@@ -205,50 +255,76 @@ async function getFirebaseAllowedIPs() {
     return [];
   }
 
-  try {
-    console.log('🔍 Buscando IPs permitidos no Firebase...');
-    const allowedIPsRef = db.collection('allowedIPs');
-    const snapshot = await allowedIPsRef.where('active', '==', true).get();
-    
-    const ips = [];
-    snapshot.forEach(doc => {
-      const data = doc.data();
-      ips.push({
-        ip: data.ip,
-        type: data.type,
-        description: data.description,
-        addedBy: data.addedBy
+  const maxRetries = 3;
+  let lastError;
+
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      console.log(`🔍 Tentativa ${attempt}/${maxRetries} - Buscando IPs permitidos no Firebase...`);
+      
+      const allowedIPsRef = db.collection('allowedIPs');
+      const snapshot = await allowedIPsRef.where('active', '==', true).get();
+      
+      console.log(`📊 Firebase query executada com sucesso. Documentos encontrados: ${snapshot.size}`);
+      
+      const ips = [];
+      snapshot.forEach(doc => {
+        const data = doc.data();
+        ips.push({
+          id: doc.id,
+          ip: data.ip,
+          type: data.type,
+          description: data.description,
+          addedBy: data.addedBy,
+          addedAt: data.addedAt
+        });
+        console.log(`  📄 Documento ${doc.id}: ${data.ip} (${data.type}) - ${data.description}`);
       });
-    });
-    
-    console.log(`📋 IPs do Firebase carregados: ${ips.length}`);
-    ips.forEach(ipData => {
-      console.log(`  - ${ipData.ip} (${ipData.type}) - ${ipData.description}`);
-    });
-    
-    return ips.map(ipData => ipData.ip);
-  } catch (error) {
-    console.error('❌ Erro ao buscar IPs do Firebase:', error);
-    return [];
+      
+      console.log(`✅ Total de IPs carregados do Firebase: ${ips.length}`);
+      return ips.map(ipData => ipData.ip);
+      
+    } catch (error) {
+      console.error(`❌ Tentativa ${attempt}/${maxRetries} falhou:`, error);
+      lastError = error;
+      
+      if (attempt < maxRetries) {
+        console.log(`⏳ Aguardando 1 segundo antes da próxima tentativa...`);
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+    }
   }
+
+  console.error(`💥 Todas as ${maxRetries} tentativas falharam. Último erro:`, lastError);
+  return [];
 }
 
 /**
  * Verifica configuração de acesso público
  */
 async function checkPublicAccess() {
-  if (!db) return { enabled: false };
+  if (!db) {
+    console.log('⚠️ Firebase não inicializado para verificar acesso público');
+    return { enabled: false };
+  }
 
   try {
+    console.log('🌍 Verificando configuração de acesso público...');
     const configRef = db.collection('systemConfig').doc('publicAccess');
     const configDoc = await configRef.get();
     
     if (configDoc.exists) {
       const config = configDoc.data();
-      console.log(`🌍 Configuração de acesso público: ${config.enabled ? 'HABILITADO' : 'DESABILITADO'}`);
+      console.log(`🌍 Acesso público: ${config.enabled ? 'HABILITADO' : 'DESABILITADO'}`);
+      if (config.enabled) {
+        console.log(`  👤 Habilitado por: ${config.enabledBy}`);
+        console.log(`  📅 Em: ${config.enabledAt}`);
+        console.log(`  📝 Motivo: ${config.reason}`);
+      }
       return config;
     }
     
+    console.log('🌍 Documento de configuração não existe - acesso público DESABILITADO');
     return { enabled: false };
   } catch (error) {
     console.error('❌ Erro ao verificar acesso público:', error);
@@ -257,60 +333,15 @@ async function checkPublicAccess() {
 }
 
 /**
- * Detecta múltiplos IPs do cliente (IPv4 e IPv6)
- */
-function detectAllClientIPs(event) {
-  const headers = event.headers || {};
-  const detectedIPs = new Set();
-  
-  // Lista de headers para verificar
-  const ipHeaders = [
-    'x-nf-client-connection-ip',
-    'x-forwarded-for',
-    'x-real-ip',
-    'x-client-ip',
-    'cf-connecting-ip',
-    'true-client-ip'
-  ];
-
-  console.log('🔍 Detectando todos os IPs possíveis...');
-
-  // Extrair IPs de todos os headers
-  for (const header of ipHeaders) {
-    const value = headers[header];
-    if (value) {
-      // Pode ter múltiplos IPs separados por vírgula
-      const ips = value.split(',').map(ip => ip.trim()).filter(ip => ip && ip !== 'unknown');
-      ips.forEach(ip => {
-        const type = detectIPType(ip);
-        if (type !== 'invalid') {
-          detectedIPs.add(ip);
-          console.log(`  📍 ${header}: ${ip} (${type})`);
-        }
-      });
-    }
-  }
-
-  // Adicionar IP do evento como fallback
-  const eventIP = event.ip || event.clientIP;
-  if (eventIP) {
-    const type = detectIPType(eventIP);
-    if (type !== 'invalid') {
-      detectedIPs.add(eventIP);
-      console.log(`  📍 event.ip: ${eventIP} (${type})`);
-    }
-  }
-
-  const allIPs = Array.from(detectedIPs);
-  console.log(`🎯 Total de IPs detectados: ${allIPs.length}`, allIPs);
-  
-  return allIPs;
-}
-
-/**
  * Netlify Function principal
  */
 exports.handler = async (event, context) => {
+  const startTime = Date.now();
+  console.log('🚀 ===== INICIANDO VERIFICAÇÃO DE IP =====');
+  console.log(`⏰ Timestamp: ${new Date().toISOString()}`);
+  console.log(`🌐 Método: ${event.httpMethod}`);
+  console.log(`📍 URL: ${event.path}`);
+  
   // Configurar CORS
   const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
@@ -320,6 +351,7 @@ exports.handler = async (event, context) => {
 
   // Handle preflight
   if (event.httpMethod === 'OPTIONS') {
+    console.log('✅ Respondendo a preflight request');
     return {
       statusCode: 200,
       headers: corsHeaders,
@@ -328,14 +360,12 @@ exports.handler = async (event, context) => {
   }
 
   try {
-    console.log('🔐 Iniciando verificação de IP...');
-    console.log('📋 Headers recebidos:', JSON.stringify(event.headers, null, 2));
-    
-    // Detectar todos os IPs possíveis do cliente
-    const allClientIPs = detectAllClientIPs(event);
+    // 1. DETECTAR IPs DO CLIENTE
+    console.log('\n🔍 ETAPA 1: DETECÇÃO DE IPs DO CLIENTE');
+    const allClientIPs = extractClientIP(event);
     
     if (allClientIPs.length === 0) {
-      console.log('❌ Nenhum IP válido detectado');
+      console.log('❌ FALHA: Nenhum IP válido detectado');
       return {
         statusCode: 200,
         headers: corsHeaders,
@@ -343,23 +373,29 @@ exports.handler = async (event, context) => {
           allowed: false,
           reason: 'IP_NOT_DETECTED',
           message: 'Não foi possível detectar seu endereço IP',
-          detectedIPs: []
+          detectedIPs: [],
+          debug: {
+            headers: Object.keys(event.headers || {}),
+            eventIP: event.ip || 'undefined',
+            clientIP: event.clientIP || 'undefined'
+          }
         })
       };
     }
 
-    console.log(`🔍 IPs detectados do cliente:`, allClientIPs);
-    
-    // Usar o primeiro IP válido como principal
-    const primaryClientIP = allClientIPs[0];
-    const ipType = detectIPType(primaryClientIP);
+    const primaryClientIP = allClientIPs[0].ip;
+    const ipType = allClientIPs[0].type;
+    const allIPs = allClientIPs.map(ipData => ipData.ip);
 
-    console.log(`🎯 IP principal: ${primaryClientIP} (${ipType})`);
+    console.log(`🎯 IP PRINCIPAL: ${primaryClientIP} (${ipType})`);
+    console.log(`📋 TODOS OS IPs: ${allIPs.join(', ')}`);
 
-    // Verificar acesso público primeiro
+    // 2. VERIFICAR ACESSO PÚBLICO
+    console.log('\n🌍 ETAPA 2: VERIFICAÇÃO DE ACESSO PÚBLICO');
     const publicAccess = await checkPublicAccess();
     if (publicAccess.enabled) {
-      console.log('🌍 Acesso público habilitado - permitindo acesso');
+      console.log('✅ ACESSO PÚBLICO HABILITADO - PERMITINDO ACESSO');
+      const duration = Date.now() - startTime;
       return {
         statusCode: 200,
         headers: corsHeaders,
@@ -368,23 +404,24 @@ exports.handler = async (event, context) => {
           reason: 'PUBLIC_ACCESS_ENABLED',
           clientIP: primaryClientIP,
           ipType,
-          allDetectedIPs: allClientIPs,
-          message: 'Acesso público habilitado'
+          allDetectedIPs: allIPs,
+          message: 'Acesso público habilitado',
+          debug: {
+            duration: `${duration}ms`,
+            publicAccessConfig: publicAccess
+          }
         })
       };
     }
 
-    // Verificar IPs hardcoded
-    let foundInHardcoded = false;
-    for (const clientIP of allClientIPs) {
-      if (isHardcodedIP(clientIP)) {
-        console.log(`✅ IP encontrado na lista hardcoded: ${clientIP}`);
-        foundInHardcoded = true;
-        break;
-      }
-    }
-
+    // 3. VERIFICAR IPs HARDCODED
+    console.log('\n🔧 ETAPA 3: VERIFICAÇÃO DE IPs HARDCODED');
+    console.log(`📋 IPs hardcoded disponíveis: ${HARDCODED_IPS.join(', ')}`);
+    
+    const foundInHardcoded = isHardcodedIP(allClientIPs);
     if (foundInHardcoded) {
+      console.log('✅ IP ENCONTRADO NA LISTA HARDCODED - PERMITINDO ACESSO');
+      const duration = Date.now() - startTime;
       return {
         statusCode: 200,
         headers: corsHeaders,
@@ -393,34 +430,57 @@ exports.handler = async (event, context) => {
           reason: 'HARDCODED_IP',
           clientIP: primaryClientIP,
           ipType,
-          allDetectedIPs: allClientIPs,
-          message: 'IP autorizado (hardcoded)'
+          allDetectedIPs: allIPs,
+          message: 'IP autorizado (hardcoded)',
+          debug: {
+            duration: `${duration}ms`,
+            hardcodedIPs: HARDCODED_IPS
+          }
         })
       };
     }
 
-    // Verificar IPs do Firebase
+    // 4. VERIFICAR IPs DO FIREBASE
+    console.log('\n🔥 ETAPA 4: VERIFICAÇÃO DE IPs DO FIREBASE');
     const firebaseIPs = await getFirebaseAllowedIPs();
-    console.log(`🔍 IPs do Firebase para verificação:`, firebaseIPs);
+    console.log(`📋 IPs do Firebase carregados: ${firebaseIPs.length}`);
+    firebaseIPs.forEach((ip, index) => {
+      console.log(`  ${index + 1}. ${ip}`);
+    });
     
     let foundInFirebase = false;
     let matchedFirebaseIP = null;
     
+    console.log('\n🔍 INICIANDO COMPARAÇÕES DETALHADAS:');
+    
     // Verificar cada IP detectado contra cada IP do Firebase
-    for (const clientIP of allClientIPs) {
-      for (const allowedIP of firebaseIPs) {
-        if (compareIPs(clientIP, allowedIP)) {
-          console.log(`✅ MATCH ENCONTRADO! Cliente: ${clientIP} = Firebase: ${allowedIP}`);
+    for (let i = 0; i < allClientIPs.length; i++) {
+      const clientIPData = allClientIPs[i];
+      console.log(`\n👤 Cliente IP ${i + 1}: ${clientIPData.ip} (${clientIPData.type})`);
+      
+      for (let j = 0; j < firebaseIPs.length; j++) {
+        const allowedIP = firebaseIPs[j];
+        const allowedType = detectIPType(allowedIP);
+        
+        console.log(`  🔍 vs Firebase IP ${j + 1}: ${allowedIP} (${allowedType})`);
+        
+        const match = compareIPs(clientIPData.ip, allowedIP);
+        console.log(`    Resultado: ${match ? '✅ MATCH!' : '❌ No match'}`);
+        
+        if (match) {
           foundInFirebase = true;
           matchedFirebaseIP = allowedIP;
+          console.log(`🎉 MATCH ENCONTRADO! Cliente: ${clientIPData.ip} = Firebase: ${allowedIP}`);
           break;
         }
       }
+      
       if (foundInFirebase) break;
     }
 
     if (foundInFirebase) {
-      console.log(`✅ IP autorizado encontrado no Firebase: ${matchedFirebaseIP}`);
+      console.log(`✅ IP AUTORIZADO ENCONTRADO NO FIREBASE: ${matchedFirebaseIP}`);
+      const duration = Date.now() - startTime;
       return {
         statusCode: 200,
         headers: corsHeaders,
@@ -429,36 +489,46 @@ exports.handler = async (event, context) => {
           reason: 'FIREBASE_IP',
           clientIP: primaryClientIP,
           ipType,
-          allDetectedIPs: allClientIPs,
+          allDetectedIPs: allIPs,
           matchedIP: matchedFirebaseIP,
-          message: 'IP autorizado (Firebase)'
+          message: 'IP autorizado (Firebase)',
+          debug: {
+            duration: `${duration}ms`,
+            firebaseIPsCount: firebaseIPs.length,
+            comparisonsPerformed: allClientIPs.length * firebaseIPs.length
+          }
         })
       };
     }
 
-    // IP não autorizado - log detalhado para debug
-    console.log(`❌ ACESSO NEGADO - IP não autorizado`);
-    console.log(`📋 IPs do cliente testados:`, allClientIPs);
-    console.log(`📋 IPs hardcoded disponíveis:`, HARDCODED_IPS);
-    console.log(`📋 IPs Firebase disponíveis:`, firebaseIPs);
+    // 5. ACESSO NEGADO - LOG COMPLETO
+    console.log('\n❌ ===== ACESSO NEGADO =====');
+    console.log(`📋 IPs do cliente testados: ${allIPs.join(', ')}`);
+    console.log(`📋 IPs hardcoded disponíveis: ${HARDCODED_IPS.join(', ')}`);
+    console.log(`📋 IPs Firebase disponíveis: ${firebaseIPs.join(', ')}`);
     
-    // Log de todas as comparações para debug
-    console.log(`🔍 DETALHES DAS COMPARAÇÕES:`);
-    for (const clientIP of allClientIPs) {
-      console.log(`  Cliente: ${clientIP} (${detectIPType(clientIP)})`);
+    console.log('\n🔍 RESUMO DAS COMPARAÇÕES:');
+    for (const clientIPData of allClientIPs) {
+      console.log(`\n👤 Cliente: ${clientIPData.ip} (${clientIPData.type})`);
       
       // Comparar com hardcoded
+      console.log('  🔧 vs Hardcoded:');
       for (const hardcodedIP of HARDCODED_IPS) {
-        const match = compareIPs(clientIP, hardcodedIP);
-        console.log(`    vs Hardcoded ${hardcodedIP}: ${match}`);
+        const match = compareIPs(clientIPData.ip, hardcodedIP);
+        console.log(`    ${hardcodedIP}: ${match ? '✅' : '❌'}`);
       }
       
       // Comparar com Firebase
+      console.log('  🔥 vs Firebase:');
       for (const firebaseIP of firebaseIPs) {
-        const match = compareIPs(clientIP, firebaseIP);
-        console.log(`    vs Firebase ${firebaseIP}: ${match}`);
+        const match = compareIPs(clientIPData.ip, firebaseIP);
+        console.log(`    ${firebaseIP}: ${match ? '✅' : '❌'}`);
       }
     }
+    
+    const duration = Date.now() - startTime;
+    console.log(`\n⏱️ Verificação concluída em ${duration}ms`);
+    console.log('🚫 RESULTADO FINAL: ACESSO NEGADO');
     
     return {
       statusCode: 200,
@@ -468,15 +538,23 @@ exports.handler = async (event, context) => {
         reason: 'IP_NOT_AUTHORIZED',
         clientIP: primaryClientIP,
         ipType,
-        allDetectedIPs: allClientIPs,
+        allDetectedIPs: allIPs,
         availableHardcodedIPs: HARDCODED_IPS,
         availableFirebaseIPs: firebaseIPs,
-        message: 'Seu endereço IP não está autorizado a acessar esta plataforma'
+        message: 'Seu endereço IP não está autorizado a acessar esta plataforma',
+        debug: {
+          duration: `${duration}ms`,
+          totalComparisons: allClientIPs.length * (HARDCODED_IPS.length + firebaseIPs.length),
+          firebaseConnection: db ? 'connected' : 'failed',
+          detectedIPsDetails: allClientIPs
+        }
       })
     };
 
   } catch (error) {
-    console.error('❌ Erro na verificação de IP:', error);
+    const duration = Date.now() - startTime;
+    console.error('❌ ERRO CRÍTICO NA VERIFICAÇÃO DE IP:', error);
+    console.log(`⏱️ Erro ocorreu após ${duration}ms`);
     
     return {
       statusCode: 500,
@@ -485,7 +563,12 @@ exports.handler = async (event, context) => {
         allowed: false,
         reason: 'VERIFICATION_ERROR',
         message: 'Erro interno na verificação de IP',
-        error: error.message
+        error: error.message,
+        debug: {
+          duration: `${duration}ms`,
+          errorStack: error.stack,
+          firebaseInitialized: !!db
+        }
       })
     };
   }

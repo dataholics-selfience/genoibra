@@ -146,13 +146,25 @@ const IPAccessGuard = ({ children, onAccessDenied }: IPAccessGuardProps) => {
       console.log('🔐 Iniciando verificação de acesso por IP...');
       
       const result = await IPRestrictionService.verifyCurrentIP();
+      console.log('📊 Resultado completo da verificação:', result);
+      
       setVerificationResult(result);
       
       if (!result.allowed) {
-        console.log('❌ Acesso negado:', result);
+        console.log('❌ Acesso negado:', {
+          reason: result.reason,
+          clientIP: result.clientIP,
+          message: result.message,
+          allDetectedIPs: result.allDetectedIPs,
+          availableFirebaseIPs: result.availableFirebaseIPs
+        });
         onAccessDenied?.();
       } else {
-        console.log('✅ Acesso autorizado:', result);
+        console.log('✅ Acesso autorizado:', {
+          reason: result.reason,
+          clientIP: result.clientIP,
+          matchedIP: result.matchedIP
+        });
       }
     } catch (error) {
       console.error('❌ Erro na verificação de acesso:', error);

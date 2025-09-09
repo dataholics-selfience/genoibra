@@ -72,7 +72,15 @@ export class IPRestrictionService {
       }
 
       const result = await response.json();
-      console.log('✅ Resultado da verificação de IP:', result);
+      console.log('✅ Resultado da verificação de IP:', {
+        allowed: result.allowed,
+        reason: result.reason,
+        clientIP: result.clientIP,
+        ipType: result.ipType,
+        allDetectedIPs: result.allDetectedIPs,
+        matchedIP: result.matchedIP,
+        debug: result.debug
+      });
       
       return result;
     } catch (error) {
@@ -90,16 +98,24 @@ export class IPRestrictionService {
    */
   static async getAllowedIPs(): Promise<AllowedIP[]> {
     try {
+      console.log('📋 Buscando IPs permitidos...');
       const q = query(
         collection(db, 'allowedIPs'),
         orderBy('addedAt', 'desc')
       );
       
       const querySnapshot = await getDocs(q);
-      return querySnapshot.docs.map(doc => ({
+      const ips = querySnapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
       })) as AllowedIP[];
+      
+      console.log(`✅ IPs carregados: ${ips.length}`);
+      ips.forEach((ip, index) => {
+        console.log(`  ${index + 1}. ${ip.ip} (${ip.type}) - ${ip.description}`);
+      });
+      
+      return ips;
     } catch (error) {
       console.error('Erro ao buscar IPs permitidos:', error);
       return [];
@@ -115,9 +131,14 @@ export class IPRestrictionService {
     addedBy: string
   ): Promise<{ success: boolean; error?: string; ipData?: AllowedIP }> {
     try {
+      console.log(`➕ Tentando adicionar IP: ${ip.trim()}`);
+      
       // Validar formato do IP
       const ipType = this.detectIPType(ip);
+      console.log(`🔍 Tipo detectado: ${ipType}`);
+      
       if (ipType === 'invalid') {
+        console.log(`❌ IP inválido: ${ip}`);
         return {
           success: false,
           error: 'Formato de IP inválido. Use IPv4 (ex: 192.168.1.1) ou IPv6 (ex: 2001:db8::1)'
@@ -125,6 +146,7 @@ export class IPRestrictionService {
       }
 
       // Verificar se IP já existe
+      console.log('🔍 Verificando se IP já existe...');
       const existingQuery = query(
         collection(db, 'allowedIPs'),
         where('ip', '==', ip.trim())
@@ -132,6 +154,7 @@ export class IPRestrictionService {
       const existingSnapshot = await getDocs(existingQuery);
       
       if (!existingSnapshot.empty) {
+        console.log(`⚠️ IP já existe: ${ip.trim()}`);
         return {
           success: false,
           error: 'Este IP já está cadastrado na lista de permitidos'
@@ -139,6 +162,7 @@ export class IPRestrictionService {
       }
 
       // Adicionar novo IP
+      console.log('💾 Salvando IP no Firebase...');
       const ipData: Omit<AllowedIP, 'id'> = {
         ip: ip.trim(),
         description: description.trim(),
@@ -150,7 +174,12 @@ export class IPRestrictionService {
 
       const docRef = await addDoc(collection(db, 'allowedIPs'), ipData);
       
-      console.log('✅ IP adicionado com sucesso:', { id: docRef.id, ip: ip.trim() });
+      console.log('✅ IP adicionado com sucesso:', { 
+        id: docRef.id, 
+        ip: ip.trim(), 
+        type: ipType,
+        description: description.trim()
+      });
       
       return {
         success: true,

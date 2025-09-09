@@ -43,11 +43,18 @@ const IPManagement = () => {
 
   const detectCurrentIP = async () => {
     try {
+      console.log('🔍 Detectando IP atual do administrador...');
       const result = await IPRestrictionService.verifyCurrentIP();
+      console.log('📊 Resultado da detecção:', result);
+      
       if (result.allDetectedIPs && result.allDetectedIPs.length > 0) {
         setCurrentUserIPs(result.allDetectedIPs);
+        console.log(`✅ IPs detectados: ${result.allDetectedIPs.join(', ')}`);
       } else if (result.clientIP) {
         setCurrentUserIPs([result.clientIP]);
+        console.log(`✅ IP principal detectado: ${result.clientIP}`);
+      } else {
+        console.log('⚠️ Nenhum IP detectado');
       }
     } catch (error) {
       console.error('Erro ao detectar IP atual:', error);
@@ -62,6 +69,12 @@ const IPManagement = () => {
       return;
     }
 
+    // Validar formato antes de enviar
+    const validation = IPRestrictionService.validateIPFormat(newIP.trim());
+    if (!validation.valid) {
+      setError(validation.error || 'Formato de IP inválido');
+      return;
+    }
     if (!auth.currentUser?.email) {
       setError('Usuário não autenticado');
       return;
@@ -71,6 +84,8 @@ const IPManagement = () => {
     setError('');
 
     try {
+      console.log(`➕ Adicionando IP: ${newIP.trim()} (${validation.type})`);
+      
       const result = await IPRestrictionService.addAllowedIP(
         newIP.trim(),
         newDescription.trim() || 'Sem descrição',
@@ -78,12 +93,14 @@ const IPManagement = () => {
       );
 
       if (result.success && result.ipData) {
+        console.log('✅ IP adicionado com sucesso:', result.ipData);
         setAllowedIPs(prev => [result.ipData!, ...prev]);
         setNewIP('');
         setNewDescription('');
         setSuccess('IP adicionado com sucesso!');
         setTimeout(() => setSuccess(''), 3000);
       } else {
+        console.error('❌ Falha ao adicionar IP:', result.error);
         setError(result.error || 'Erro ao adicionar IP');
       }
     } catch (error) {
@@ -286,6 +303,8 @@ const IPManagement = () => {
           <div className="space-y-3 mb-4">
             {currentUserIPs.map((ip, index) => {
               const ipType = IPRestrictionService.validateIPFormat(ip).type || 'unknown';
+              const isAlreadyAdded = allowedIPs.some(allowedIP => allowedIP.ip === ip);
+              
               return (
                 <div key={index} className="bg-gray-700 rounded-lg p-4">
                   <div className="flex items-center justify-between">
@@ -298,6 +317,11 @@ const IPManagement = () => {
                       }`}>
                         {ipType.toUpperCase()}
                       </span>
+                      {isAlreadyAdded && (
+                        <span className="text-xs bg-green-600 text-green-100 px-2 py-1 rounded-full">
+                          ✅ Já adicionado
+                        </span>
+                      )}
                     </div>
                     <div className="flex gap-2">
                       <button
@@ -307,13 +331,15 @@ const IPManagement = () => {
                       >
                         <Copy size={16} />
                       </button>
-                      <button
-                        onClick={() => addCurrentIP(ip)}
-                        className="text-blue-400 hover:text-blue-300 text-sm px-3 py-1 bg-blue-900/30 rounded"
-                        title="Adicionar à lista de permitidos"
-                      >
-                        Adicionar
-                      </button>
+                      {!isAlreadyAdded && (
+                        <button
+                          onClick={() => addCurrentIP(ip)}
+                          className="text-blue-400 hover:text-blue-300 text-sm px-3 py-1 bg-blue-900/30 rounded"
+                          title="Adicionar à lista de permitidos"
+                        >
+                          Adicionar
+                        </button>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -346,6 +372,24 @@ const IPManagement = () => {
             <p className="text-xs text-gray-400 mt-1">
               Exemplos: 192.168.1.1 (IPv4) ou 2001:db8::1 (IPv6)
             </p>
+            {newIP.trim() && (
+              <div className="mt-2">
+                {(() => {
+                  const validation = IPRestrictionService.validateIPFormat(newIP.trim());
+                  return validation.valid ? (
+                    <div className="flex items-center gap-2 text-green-400 text-xs">
+                      <CheckCircle size={12} />
+                      <span>IP válido ({validation.type?.toUpperCase()})</span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2 text-red-400 text-xs">
+                      <AlertTriangle size={12} />
+                      <span>{validation.error}</span>
+                    </div>
+                  );
+                })()}
+              </div>
+            )}
           </div>
 
           <div>
@@ -428,7 +472,7 @@ const IPManagement = () => {
                         {getIPTypeIcon(ip.type)}
                         {currentUserIPs.includes(ip.ip) && (
                           <span className="text-xs bg-green-600 text-green-100 px-2 py-1 rounded-full">
-                            Seu IP
+                            🎯 Seu IP
                           </span>
                         )}
                       </div>
@@ -477,7 +521,18 @@ const IPManagement = () => {
           <li>• Suporte completo para IPv4 e IPv6</li>
           <li>• O toggle "Acesso Público" desabilita temporariamente todas as restrições</li>
           <li>• Logs de acesso são mantidos para auditoria</li>
+          <li>• 🔍 <strong>Debug:</strong> Verifique os logs da Netlify Function para troubleshooting</li>
         </ul>
+        
+        <div className="mt-4 pt-4 border-t border-blue-700">
+          <h5 className="text-blue-200 font-medium mb-2">🛠️ Troubleshooting</h5>
+          <div className="text-blue-100 text-xs space-y-1">
+            <p>• Se o IP não funciona após adicionar, verifique os logs da Netlify Function</p>
+            <p>• Certifique-se de que o Firebase está conectado corretamente</p>
+            <p>• IPs IPv6 são normalizados automaticamente para comparação</p>
+            <p>• Use o botão "Adicionar" ao lado do seu IP atual para garantir formato correto</p>
+          </div>
+        </div>
       </div>
     </div>
   );
