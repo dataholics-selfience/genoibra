@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { needsLoginVerification } from '../../utils/verificationStateManager';
 import { 
   updateProfile, 
   sendPasswordResetEmail,
@@ -26,31 +25,6 @@ import { useTranslation } from '../../utils/i18n';
 const UserManagement = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
-
-  // Check login verification status
-  useEffect(() => {
-    const checkVerificationStatus = async () => {
-      if (!auth.currentUser) {
-        navigate('/login');
-        return;
-      }
-
-      try {
-        const needsVerification = await needsLoginVerification(auth.currentUser.uid);
-        if (needsVerification) {
-          navigate('/verify-login', { replace: true });
-          return;
-        }
-      } catch (error) {
-        console.error('Error checking verification status:', error);
-        navigate('/verify-login', { replace: true });
-        return;
-      }
-    };
-
-    checkVerificationStatus();
-  }, [navigate]);
-
   const [userData, setUserData] = useState<UserType | null>(null);
   const [tokenUsage, setTokenUsage] = useState<TokenUsageType | null>(null);
   const [formData, setFormData] = useState({

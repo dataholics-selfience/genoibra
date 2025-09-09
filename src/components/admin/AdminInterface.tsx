@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { needsLoginVerification } from '../../utils/verificationStateManager';
 import { 
   ArrowLeft, Search, Trash2, Database, Settings, 
   CheckSquare, Square, Loader2, AlertTriangle, 
@@ -23,31 +22,6 @@ interface Startup {
 
 const AdminInterface = () => {
   const navigate = useNavigate();
-
-  // Check if user is authorized admin and has verification
-  useEffect(() => {
-    const checkAccess = async () => {
-      if (!auth.currentUser || auth.currentUser.email !== 'contact@dataholics.io') {
-        navigate('/');
-        return;
-      }
-
-      try {
-        const needsVerification = await needsLoginVerification(auth.currentUser.uid);
-        if (needsVerification) {
-          navigate('/verify-login', { replace: true });
-          return;
-        }
-      } catch (error) {
-        console.error('Error checking verification status:', error);
-        navigate('/verify-login', { replace: true });
-        return;
-      }
-    };
-
-    checkAccess();
-  }, [navigate]);
-
   const [startups, setStartups] = useState<Startup[]>([]);
   const [selectedStartups, setSelectedStartups] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
@@ -60,6 +34,13 @@ const AdminInterface = () => {
     return Array.from({ length: 24 }, () => Math.floor(Math.random() * 16).toString(16)).join('');
   });
 
+  // Check if user is authorized admin
+  useEffect(() => {
+    if (!auth.currentUser || auth.currentUser.email !== 'contact@dataholics.io') {
+      navigate('/');
+      return;
+    }
+  }, [navigate]);
 
   // Load startups on component mount
   useEffect(() => {

@@ -76,9 +76,9 @@ const Login = () => {
         throw new Error('No user data available');
       }
 
+
       setError('');
-      // After successful login, redirect to verification page
-      navigate('/verify-login', { replace: true });
+      navigate('/', { replace: true });
       
     } catch (error: any) {
       console.error('Login error:', error);

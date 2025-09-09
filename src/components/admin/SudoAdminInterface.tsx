@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { needsLoginVerification } from '../../utils/verificationStateManager';
 import { 
   ArrowLeft, Plus, Trash2, Shield, 
   CheckCircle, AlertTriangle, QrCode, Copy, Clock, Mail, Users
@@ -31,31 +30,6 @@ interface RegistrationToken {
 
 const SudoAdminInterface = () => {
   const navigate = useNavigate();
-
-  // Check if user is authorized sudo admin and has verification
-  useEffect(() => {
-    const checkAccess = async () => {
-      if (!auth.currentUser || auth.currentUser.email !== 'daniel.mendes@dataholics.io') {
-        navigate('/');
-        return;
-      }
-
-      try {
-        const needsVerification = await needsLoginVerification(auth.currentUser.uid);
-        if (needsVerification) {
-          navigate('/verify-login', { replace: true });
-          return;
-        }
-      } catch (error) {
-        console.error('Error checking verification status:', error);
-        navigate('/verify-login', { replace: true });
-        return;
-      }
-    };
-
-    checkAccess();
-  }, [navigate]);
-
   const [registrationTokens, setRegistrationTokens] = useState<RegistrationToken[]>([]);
   const [newEmail, setNewEmail] = useState('');
   const [loading, setLoading] = useState(false);
@@ -63,6 +37,13 @@ const SudoAdminInterface = () => {
   const [success, setSuccess] = useState('');
   const [showQRModal, setShowQRModal] = useState<RegistrationToken | null>(null);
 
+  // Check if user is authorized sudo admin
+  useEffect(() => {
+    if (!auth.currentUser || auth.currentUser.email !== 'daniel.mendes@dataholics.io') {
+      navigate('/');
+      return;
+    }
+  }, [navigate]);
 
   // Load registration tokens
   useEffect(() => {
