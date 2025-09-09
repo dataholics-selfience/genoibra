@@ -156,7 +156,7 @@ const LoginVerification = () => {
     }
 
     // Check attempts limit
-    if (attempts >= 3) {
+    if (attempts >= 5) {
       setCooldownTime(300); // 5 minutes cooldown
       setError('Limite de tentativas excedido. Aguarde 5 minutos antes de tentar novamente.');
       return;
@@ -225,7 +225,7 @@ const LoginVerification = () => {
               <div style="background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 6px; padding: 15px; margin: 20px 0;">
                 <p style="margin: 0; color: #856404; font-size: 14px;">
                   <strong>⚠️ Importante:</strong> Este código expira em 1 minuto. 
-                  Se não conseguir usar a tempo, você pode solicitar um novo código (máximo 3 tentativas).
+                  Se não conseguir usar a tempo, você pode solicitar um novo código (máximo 5 tentativas).
                 </p>
               </div>
               
@@ -377,7 +377,7 @@ const LoginVerification = () => {
   };
 
   const canRequestNewCode = () => {
-    return cooldownTime === 0 && attempts < 3 && countdown === 0;
+    return cooldownTime === 0 && attempts < 5 && countdown === 0;
   };
 
   return (
@@ -504,7 +504,7 @@ const LoginVerification = () => {
                 ) : (
                   <>
                     <RefreshCw size={16} />
-                    Enviar Novo Código ({3 - attempts} tentativas restantes)
+                    Enviar Novo Código ({5 - attempts} tentativas restantes)
                   </>
                 )}
               </button>
@@ -520,8 +520,8 @@ const LoginVerification = () => {
           </h4>
           <ul className="text-blue-100 text-sm space-y-1">
             <li>• O código tem 6 caracteres e expira em 1 minuto</li>
-            <li>• Você tem até 3 tentativas para solicitar novos códigos</li>
-            <li>• Após 3 tentativas, aguarde 5 minutos para tentar novamente</li>
+            <li>• Você tem até 5 tentativas para solicitar novos códigos</li>
+            <li>• Após 5 tentativas, aguarde 5 minutos para tentar novamente</li>
             <li>• Nunca compartilhe este código com terceiros</li>
             <li>• Se não solicitou este código, ignore o email</li>
           </ul>

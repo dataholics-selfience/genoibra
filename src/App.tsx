@@ -18,11 +18,14 @@ import SudoAdminInterface from './components/admin/SudoAdminInterface';
 import TokenRegister from './components/auth/TokenRegister';
 import SlugRegister from './components/auth/SlugRegister';
 import PublicChallenge from './components/PublicChallenge';
+import LoginVerification from './components/auth/LoginVerification';
+import { needsLoginVerification } from './utils/verificationStateManager';
 
 function App() {
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [languageInitialized, setLanguageInitialized] = useState(false);
+  const [needsVerification, setNeedsVerification] = useState(false);
 
   useEffect(() => {
     // Initialize language detection
@@ -47,15 +50,22 @@ function App() {
           if (userDoc.exists() && userDoc.data().disabled) {
             await signOut(auth);
             setUser(null);
+            setNeedsVerification(false);
           } else {
             setUser(user);
+            // Check if user needs verification
+            const needsVerif = needsLoginVerification(user.uid);
+            setNeedsVerification(needsVerif);
           }
         } catch (error) {
           console.error('Error checking user status:', error);
           setUser(user);
+          // In case of error, require verification for security
+          setNeedsVerification(true);
         }
       } else {
         setUser(null);
+        setNeedsVerification(false);
       }
       setLoading(false);
     });
@@ -74,6 +84,20 @@ function App() {
   return (
     <Router>
       <Routes>
+        {/* Login Verification Route - Must be before protected routes */}
+        <Route 
+          path="/login-verification" 
+          element={
+            user && needsVerification ? (
+              <LoginVerification />
+            ) : user ? (
+              <Navigate to="/" replace />
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          } 
+        />
+        
         {/* Authentication Routes */}
         <Route path="/login" element={!user ? <Login /> : <Navigate to="/" replace />} />
         <Route path="/register" element={!user ? <Register /> : <Navigate to="/" replace />} />
@@ -83,10 +107,62 @@ function App() {
         <Route path="/challenge/:slug" element={<PublicChallenge />} />
         
         {/* Protected Routes */}
-        <Route path="/profile" element={user ? <UserManagement /> : <Navigate to="/login" replace />} />
-        <Route path="/new-challenge" element={user ? <NewChallenge /> : <Navigate to="/login" replace />} />
-        <Route path="/startups" element={user ? <StartupList /> : <Navigate to="/login" replace />} />
-        <Route path="/saved-startups" element={user ? <SavedStartups /> : <Navigate to="/login" replace />} />
+        <Route 
+          path="/profile" 
+          element={
+            user ? (
+              needsVerification ? (
+                <Navigate to="/login-verification" replace />
+              ) : (
+                <UserManagement />
+              )
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          } 
+        />
+        <Route 
+          path="/new-challenge" 
+          element={
+            user ? (
+              needsVerification ? (
+                <Navigate to="/login-verification" replace />
+              ) : (
+                <NewChallenge />
+              )
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          } 
+        />
+        <Route 
+          path="/startups" 
+          element={
+            user ? (
+              needsVerification ? (
+                <Navigate to="/login-verification" replace />
+              ) : (
+                <StartupList />
+              )
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          } 
+        />
+        <Route 
+          path="/saved-startups" 
+          element={
+            user ? (
+              needsVerification ? (
+                <Navigate to="/login-verification" replace />
+              ) : (
+                <SavedStartups />
+              )
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          } 
+        />
         <Route path="/account-deleted" element={<AccountDeleted />} />
         
         {/* Admin Route - Only for contact@dataholics.io */}
@@ -94,7 +170,11 @@ function App() {
           path="/admin" 
           element={
             user && user?.email === 'contact@dataholics.io' ? (
-              <AdminInterface />
+              needsVerification ? (
+                <Navigate to="/login-verification" replace />
+              ) : (
+                <AdminInterface />
+              )
             ) : (
               <Navigate to="/" replace />
             )
@@ -106,7 +186,11 @@ function App() {
           path="/sudo-admin" 
           element={
             user && user?.email === 'daniel.mendes@dataholics.io' ? (
-              <SudoAdminInterface />
+              needsVerification ? (
+                <Navigate to="/login-verification" replace />
+              ) : (
+                <SudoAdminInterface />
+              )
             ) : (
               <Navigate to="/" replace />
             )
@@ -116,7 +200,11 @@ function App() {
         {/* Default Route */}
         <Route path="/" element={
           user ? (
-            <Layout />
+            needsVerification ? (
+              <Navigate to="/login-verification" replace />
+            ) : (
+              <Layout />
+            )
           ) : (
             <Navigate to="/login" replace />
           )
