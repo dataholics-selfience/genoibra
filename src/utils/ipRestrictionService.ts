@@ -199,8 +199,41 @@ export class IPRestrictionService {
    */
   static async removeAllowedIP(ipId: string): Promise<{ success: boolean; error?: string }> {
     try {
+      console.log(`🗑️ Iniciando remoção do IP com ID: ${ipId}`);
+      
+      // Verificar se o documento existe antes de deletar
+      const docRef = doc(db, 'allowedIPs', ipId);
+      const docSnap = await getDoc(docRef);
+      
+      if (!docSnap.exists()) {
+        console.log(`⚠️ Documento não encontrado: ${ipId}`);
+        return {
+          success: false,
+          error: 'IP não encontrado na base de dados'
+        };
+      }
+      
+      const ipData = docSnap.data();
+      console.log(`📄 Documento encontrado:`, { id: ipId, ip: ipData.ip, description: ipData.description });
+      
       await deleteDoc(doc(db, 'allowedIPs', ipId));
-      console.log('✅ IP removido com sucesso:', ipId);
+      
+      console.log(`✅ IP removido com sucesso:`, { id: ipId, ip: ipData.ip });
+      
+      // Aguardar um pouco para garantir que a exclusão foi processada
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Verificar se realmente foi deletado
+      const verifyDoc = await getDoc(docRef);
+      if (verifyDoc.exists()) {
+        console.error(`❌ ERRO: Documento ainda existe após exclusão!`);
+        return {
+          success: false,
+          error: 'Falha na exclusão - documento ainda existe'
+        };
+      }
+      
+      console.log(`✅ Exclusão confirmada - documento não existe mais`);
       
       return { success: true };
     } catch (error) {

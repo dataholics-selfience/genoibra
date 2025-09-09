@@ -219,23 +219,28 @@ function isHardcodedIP(clientIPs) {
 /**
  * Busca IPs permitidos usando REST API do Firebase
  */
-async function getFirebaseAllowedIPs() {
+async function getFirebaseAllowedIPs(event) {
   const maxRetries = 3;
   let lastError;
 
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
-      console.log(`🔍 Tentativa ${attempt}/${maxRetries} - Buscando IPs via REST API...`);
+      console.log(`🔍 Tentativa ${attempt}/${maxRetries} - Buscando IPs via REST API (${new Date().toISOString()})...`);
       
       // Usar REST API do Firestore em vez do Admin SDK
-      const url = `${FIREBASE_CONFIG.firestoreUrl}/allowedIPs?key=${FIREBASE_CONFIG.apiKey}`;
+      // Adicionar timestamp para evitar cache
+      const timestamp = Date.now();
+      const url = `${FIREBASE_CONFIG.firestoreUrl}/allowedIPs?key=${FIREBASE_CONFIG.apiKey}&_t=${timestamp}`;
       
       console.log(`🌐 Fazendo requisição para: ${url}`);
       
       const response = await fetch(url, {
         method: 'GET',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0'
         }
       });
 
@@ -245,6 +250,7 @@ async function getFirebaseAllowedIPs() {
 
       const data = await response.json();
       console.log(`📊 Resposta da REST API recebida. Status: ${response.status}`);
+      console.log(`📊 Dados brutos recebidos:`, JSON.stringify(data, null, 2));
       
       if (!data.documents) {
         console.log(`📄 Nenhum documento encontrado na coleção allowedIPs`);
@@ -262,13 +268,16 @@ async function getFirebaseAllowedIPs() {
           const type = fields.type?.stringValue;
           const description = fields.description?.stringValue;
           const addedBy = fields.addedBy?.stringValue;
+          const addedAt = fields.addedAt?.stringValue;
           
           console.log(`  📄 Documento ${index + 1}:`, {
+            docId: doc.name?.split('/').pop(),
             ip,
             active,
             type,
             description,
-            addedBy
+            addedBy,
+            addedAt
           });
           
           // Só incluir IPs ativos
@@ -287,6 +296,14 @@ async function getFirebaseAllowedIPs() {
       ips.forEach((ip, index) => {
         console.log(`  ${index + 1}. ${ip}`);
       });
+      
+      // Verificar se o IP do cliente está na lista (para debug)
+      const clientIPs = extractClientIP(event);
+      if (clientIPs.length > 0) {
+        const primaryIP = clientIPs[0].ip;
+        const isInList = ips.includes(primaryIP);
+        console.log(`🔍 IP do cliente (${primaryIP}) está na lista Firebase: ${isInList ? 'SIM' : 'NÃO'}`);
+      }
       
       return ips;
       

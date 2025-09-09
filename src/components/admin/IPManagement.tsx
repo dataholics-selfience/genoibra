@@ -120,20 +120,33 @@ const IPManagement = () => {
   };
 
   const handleRemoveIP = async (ipId: string, ipAddress: string) => {
+    console.log(`🗑️ Tentando remover IP: ${ipAddress} (ID: ${ipId})`);
+    
     const confirmed = window.confirm(
       `Tem certeza que deseja remover o IP "${ipAddress}" da lista de permitidos?\n\nAtenção: Se este for seu IP atual, você perderá acesso à plataforma!`
     );
 
     if (!confirmed) return;
 
+    setError('');
+    
     try {
+      console.log(`🚀 Iniciando processo de remoção...`);
       const result = await IPRestrictionService.removeAllowedIP(ipId);
       
       if (result.success) {
+        console.log(`✅ IP removido com sucesso do Firebase`);
         setAllowedIPs(prev => prev.filter(ip => ip.id !== ipId));
         setSuccess('IP removido com sucesso!');
         setTimeout(() => setSuccess(''), 3000);
+        
+        // Forçar reload da lista para garantir sincronização
+        console.log(`🔄 Recarregando lista de IPs para confirmar exclusão...`);
+        setTimeout(() => {
+          loadData();
+        }, 2000);
       } else {
+        console.error(`❌ Falha na remoção:`, result.error);
         setError(result.error || 'Erro ao remover IP');
       }
     } catch (error) {
