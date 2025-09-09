@@ -1,7 +1,6 @@
 [build]
   publish = "dist"
   command = "npm run build"
-  functions = "netlify/functions"
 
 [[redirects]]
   from = "/*"
@@ -11,3 +10,4 @@
 [functions]
   directory = "netlify/functions"
   node_bundler = "esbuild"
+  external_node_modules = ["firebase-admin"]
