@@ -2,6 +2,35 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Aumento global de fontes em 15% */
+html {
+  font-size: 110%; /* 16px -> ~18.4px (15% maior) */
+}
+
+/* Ajustes específicos para manter proporções */
+body {
+  font-size: 1rem; /* Agora será ~18.4px */
+}
+
+h1 { font-size: 1.5rem; } /* ~27.6px */
+h2 { font-size: 1.25rem; } /* ~23px */
+h3 { font-size: 1.125rem; } /* ~20.7px */
+h4 { font-size: 1rem; } /* ~18.4px */
+
+/* Botões e inputs proporcionais */
+button, input, textarea, select {
+  font-size: 0.875rem; /* ~16.1px */
+}
+
+/* Classes de texto com aumento de 15% */
+.text-xs { font-size: 0.625rem; } /* ~11.5px */
+.text-sm { font-size: 0.75rem; } /* ~13.8px */
+.text-base { font-size: 0.875rem; } /* ~16.1px */
+.text-lg { font-size: 1rem; } /* ~18.4px */
+.text-xl { font-size: 1.125rem; } /* ~20.7px */
+.text-2xl { font-size: 1.25rem; } /* ~23px */
+.text-3xl { font-size: 1.5rem; } /* ~27.6px */
+
 @keyframes typing {
   from { opacity: 0; }
   to { opacity: 1; }

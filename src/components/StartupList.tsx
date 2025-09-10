@@ -4,7 +4,7 @@ import {
   Star, Calendar, Building2, MapPin, Users, Briefcase, Award, Edit, Save, X,
   Target, Rocket, ArrowLeft, Mail, Globe, Box, Linkedin,
   Facebook, Twitter, Instagram, FolderOpen, Plus, Check, BarChart3, Download,
-  Phone, DollarSign, TrendingUp, CheckCircle, AlertCircle
+  Edit2, CheckCircle, Phone, DollarSign, TrendingUp
 } from 'lucide-react';
 import { collection, query, orderBy, limit, getDocs, addDoc, where, deleteDoc, doc, updateDoc } from 'firebase/firestore';
 import { db, auth } from '../firebase';
@@ -12,6 +12,7 @@ import { StartupListType, StartupType, SocialLink } from '../types';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useTranslation } from '../utils/i18n';
+import StartupCardGenerator from './StartupCardGenerator';
 import { Link } from 'react-router-dom';
 import html2pdf from 'html2pdf.js';
 
@@ -193,7 +194,8 @@ const StartupCard = ({
   challengeTitle, 
   challengeId,
   onStartupSaved,
-  onStartupUpdated
+  onStartupUpdated,
+  onGenerateCard
 }: { 
   startup: StartupType; 
   onClick: () => void;
@@ -201,6 +203,7 @@ const StartupCard = ({
   challengeId: string;
   onStartupSaved: () => void;
   onStartupUpdated: (updatedStartup: StartupType) => void;
+  onGenerateCard: (startup: StartupType, challengeTitle: string) => void;
 }) => {
   const { t } = useTranslation();
   const [isSaving, setIsSaving] = useState(false);
@@ -326,6 +329,11 @@ const StartupCard = ({
     }
   };
 
+  const handleGenerateCard = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onGenerateCard(displayData, challengeTitle);
+  };
+
   const getCurrentStage = () => {
     if (!savedStartup) return null;
     return pipelineStages.find(stage => stage.id === savedStartup.stage);
@@ -367,6 +375,13 @@ const StartupCard = ({
               className="text-gray-400 hover:text-white p-1 rounded"
             >
               {isEditing ? <X size={16} /> : <Edit size={16} />}
+            </button>
+            <button
+              onClick={handleGenerateCard}
+              className="text-gray-400 hover:text-white p-1 rounded"
+              title="Gerar Card"
+            >
+              <FolderOpen size={16} />
             </button>
             <button
               onClick={handleSelectStartup}
@@ -633,6 +648,7 @@ const StartupDetailCard = ({
   const [isEditing, setIsEditing] = useState(false);
   const [editData, setEditData] = useState<StartupType>(startup);
   const [isExportingPDF, setIsExportingPDF] = useState(false);
+  const [showCardGenerator, setShowCardGenerator] = useState<{startup: StartupType, challengeTitle: string} | null>(null);
 
   useEffect(() => {
     const checkIfSaved = async () => {
@@ -850,23 +866,18 @@ const StartupDetailCard = ({
         <div className="flex flex-col items-end gap-2">
           <div className="flex gap-2">
             <button
+              onClick={() => setShowCardGenerator({ startup: displayData, challengeTitle: 'Desafio' })}
+              className="text-gray-400 hover:text-white p-1 rounded"
+              title="Gerar Card"
+            >
+              <Download size={16} />
+            </button>
+            <button
               onClick={() => setIsEditing(!isEditing)}
               className="flex items-center gap-2 px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors text-sm"
             >
               {isEditing ? <X size={16} /> : <Edit size={16} />}
               {isEditing ? 'Cancelar' : 'Editar'}
-            </button>
-            <button
-              onClick={exportToPDF}
-              disabled={isExportingPDF}
-              className="flex items-center gap-2 px-3 py-1 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 text-white rounded-lg transition-colors text-sm"
-            >
-              {isExportingPDF ? (
-                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-              ) : (
-                <Download size={16} />
-              )}
-              {isExportingPDF ? 'Gerando...' : 'Salvar PDF'}
             </button>
             <button
               onClick={handleSelectStartup}
@@ -1477,6 +1488,16 @@ const StartupDetailCard = ({
           )}
         </div>
       </div>
+
+      {/* Card Generator Modal */}
+      {showCardGenerator && (
+        <StartupCardGenerator
+          startup={showCardGenerator.startup}
+          challengeTitle={showCardGenerator.challengeTitle}
+          startupId={showCardGenerator.startup.id || ''}
+          onClose={() => setShowCardGenerator(null)}
+        />
+      )}
     </div>
   );
 };
@@ -1488,6 +1509,7 @@ const StartupList = () => {
   const [selectedStartup, setSelectedStartup] = useState<StartupType | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
   const [editableStartups, setEditableStartups] = useState<StartupType[]>([]);
+  const [showCardGenerator, setShowCardGenerator] = useState<{ startup: StartupType; challengeTitle: string } | null>(null);
 
   useEffect(() => {
     const fetchStartupData = async () => {
@@ -1557,6 +1579,10 @@ const StartupList = () => {
     setRefreshKey(prev => prev + 1);
   };
 
+  const handleGenerateCard = (startup: StartupType, challengeTitle: string) => {
+    setShowCardGenerator({ startup, challengeTitle });
+  };
+
   if (!startupData) {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center">
@@ -1586,6 +1612,16 @@ const StartupList = () => {
             onStartupUpdated={handleStartupUpdated}
           />
         </div>
+
+        {/* Card Generator Modal */}
+        {showCardGenerator && (
+          <StartupCardGenerator
+            startup={showCardGenerator.startup}
+            challengeTitle={showCardGenerator.challengeTitle}
+            startupId={showCardGenerator.startup.id || ''}
+            onClose={() => setShowCardGenerator(null)}
+          />
+        )}
       </div>
     );
   }
@@ -1629,6 +1665,7 @@ const StartupList = () => {
                 challengeId={startupData.id}
                 onStartupSaved={handleStartupSaved}
                 onStartupUpdated={handleStartupUpdated}
+                onGenerateCard={handleGenerateCard}
               />
             ))}
           </div>
@@ -1645,6 +1682,16 @@ const StartupList = () => {
           </div>
         </div>
       </div>
+
+      {/* Card Generator Modal */}
+      {showCardGenerator && (
+        <StartupCardGenerator
+          startup={showCardGenerator.startup}
+          challengeTitle={showCardGenerator.challengeTitle}
+          startupId={showCardGenerator.startup.id || ''}
+          onClose={() => setShowCardGenerator(null)}
+        />
+      )}
     </div>
   );
 };

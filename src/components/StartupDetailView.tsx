@@ -992,6 +992,7 @@ const StartupDetailView = () => {
       {showCardGenerator && startup && (
         <StartupCardGenerator
           startup={startup}
+          startupId={startupId!}
           challengeTitle={challengeTitle}
           onClose={() => setShowCardGenerator(false)}
         />

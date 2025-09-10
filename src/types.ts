@@ -100,6 +100,7 @@ export interface StartupType {
   tags?: string;
   dataCompleteness?: number;
   keyStrengths?: string[];
+  logoBase64?: string;
   solution?: {
     nome?: string;
     site?: string;
