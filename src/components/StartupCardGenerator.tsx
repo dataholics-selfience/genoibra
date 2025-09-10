@@ -1,15 +1,15 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Download, X, Edit2, Save, Upload, Check, Plus, Minus } from 'lucide-react';
 import { StartupType } from '../types';
 import html2pdf from 'html2pdf.js';
-import { doc, updateDoc } from 'firebase/firestore';
+import { doc, updateDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { db, auth } from '../firebase';
 
 interface StartupCardGeneratorProps {
   startup: StartupType;
   challengeTitle: string;
   onClose: () => void;
-  startupId: string;
+  startupId?: string;
 }
 
 const StartupCardGenerator = ({ startup, challengeTitle, onClose, startupId }: StartupCardGeneratorProps) => {
@@ -20,6 +20,31 @@ const StartupCardGenerator = ({ startup, challengeTitle, onClose, startupId }: S
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [savedStartup, setSavedStartup] = useState<any>(null);
+
+  // Find the saved startup to get the correct ID
+  useEffect(() => {
+    const findSavedStartup = async () => {
+      if (!auth.currentUser) return;
+      
+      try {
+        const q = query(
+          collection(db, 'selectedStartups'),
+          where('userId', '==', auth.currentUser.uid),
+          where('startupName', '==', startup.name)
+        );
+        const querySnapshot = await getDocs(q);
+        if (!querySnapshot.empty) {
+          const savedData = { id: querySnapshot.docs[0].id, ...querySnapshot.docs[0].data() };
+          setSavedStartup(savedData);
+        }
+      } catch (error) {
+        console.error('Error finding saved startup:', error);
+      }
+    };
+
+    findSavedStartup();
+  }, [startup.name]);
 
   const formatValue = (value: any, fallback: string = 'NÃO DIVULGADO'): string => {
     if (!value || value === 'NÃO DIVULGADO' || value === 'N/A' || value === '') {
@@ -93,18 +118,19 @@ const StartupCardGenerator = ({ startup, challengeTitle, onClose, startupId }: S
   const handleSave = async () => {
     setError(null);
     
-    console.log('🔍 Debug save - startupId:', startupId);
+    const actualStartupId = startupId || savedStartup?.id;
+    
+    console.log('🔍 Debug save - startupId:', actualStartupId);
+    console.log('🔍 Debug save - savedStartup:', savedStartup);
     console.log('🔍 Debug save - auth.currentUser:', auth.currentUser?.uid);
-    console.log('🔍 Debug save - startupId type:', typeof startupId);
-    console.log('🔍 Debug save - startupId length:', startupId?.length);
     
     if (!auth.currentUser) {
       setError('Sessão expirada. Faça login novamente.');
       return;
     }
     
-    if (!startupId || startupId.trim() === '') {
-      setError(`ID da startup não encontrado. startupId recebido: ${startupId}`);
+    if (!actualStartupId || actualStartupId.trim() === '') {
+      setError(`ID da startup não encontrado. startupId recebido: ${actualStartupId}`);
       return;
     }
 
@@ -120,7 +146,7 @@ const StartupCardGenerator = ({ startup, challengeTitle, onClose, startupId }: S
         updatedAt: new Date().toISOString()
       };
 
-      await updateDoc(doc(db, 'selectedStartups', startupId), updateData);
+      await updateDoc(doc(db, 'selectedStartups', actualStartupId), updateData);
 
       setSaveSuccess(true);
       setTimeout(() => {
@@ -346,8 +372,13 @@ const StartupCardGenerator = ({ startup, challengeTitle, onClose, startupId }: S
                 </h1>
                 <div className="flex items-center gap-6">
                   <div style={{ height: '40px', display: 'flex', alignItems: 'center', gap: '20px' }}>
-                    <span style={{ color: '#d32f2f', fontWeight: 'bold', fontSize: '18px' }}>inovabra</span>
-                    <span style={{ color: '#d32f2f', fontWeight: 'bold', fontSize: '18px' }}>bradesco</span>
+
+                    <img 
+                      src="https://genoi.net/wp-content/uploads/2025/09/logo-inovabra-bradesco.png" 
+                      alt="Inovabra Bradesco" 
+                      style={{ height: '40px', width: 'auto', objectFit: 'contain' }}
+                      crossOrigin="anonymous"
+                    />
                   </div>
                 </div>
               </div>
@@ -412,9 +443,6 @@ const StartupCardGenerator = ({ startup, challengeTitle, onClose, startupId }: S
 
                 {/* Middle Column - Financial Info */}
                 <div className="col-span-5 space-y-2 text-sm">
-                  <br />
-                  <br />
-                  <br />
                   <br />
                   <br />
                   <br />
@@ -486,8 +514,8 @@ const StartupCardGenerator = ({ startup, challengeTitle, onClose, startupId }: S
               {/* Founders Section */}
               {displayData.fundadores && displayData.fundadores.length > 0 && (
                 <div className="mb-6">
-                    {formatValue(startup.problemaSolve) !== 'NÃO DIVULGADO' ? (
-                      <p>{startup.problemaSolve}</p>
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-lg font-bold text-gray-800">FUNDADORES</h3>
                     {isEditing && (
                       <button
                         onClick={addFounder}
