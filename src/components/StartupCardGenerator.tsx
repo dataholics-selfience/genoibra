@@ -284,13 +284,6 @@ const StartupCardGenerator = ({ startup, challengeTitle, onClose, startupId }: S
               </>
             ) : (
               <>
-                <button
-                  onClick={() => setIsEditing(true)}
-                  className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors"
-                >
-                  <Edit2 size={16} />
-                  Editar
-                </button>
               </>
             )}
             <button
@@ -416,11 +409,6 @@ const StartupCardGenerator = ({ startup, challengeTitle, onClose, startupId }: S
                   <br />
                   <br />
                   <br />
-                  <br />
-                  <br />
-                  <br />
-                  <br />
-                  <br />
                   <div>
                     <span className="font-bold text-gray-800">INVESTIMENTOS: </span>
                     <span className="text-gray-700">
@@ -486,17 +474,95 @@ const StartupCardGenerator = ({ startup, challengeTitle, onClose, startupId }: S
               {/* Founders Section */}
               {displayData.fundadores && displayData.fundadores.length > 0 && (
                 <div className="mb-6">
-                    {formatValue(startup.problemaSolve) !== 'NÃO DIVULGADO' ? (
-                      <p>{startup.problemaSolve}</p>
-                    {isEditing && (
-                      <button
-                        onClick={addFounder}
-                        className="flex items-center gap-1 px-2 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-xs font-medium transition-colors"
-                      >
-                        <Plus size={12} />
-                        Adicionar
-                      </button>
-                    )}
+                  <div className="bg-gray-50 rounded-lg p-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <h3 className="text-lg font-bold text-gray-800">FUNDADORES</h3>
+                      {isEditing && (
+                        <button
+                          onClick={addFounder}
+                          className="flex items-center gap-1 px-2 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-xs font-medium transition-colors"
+                        >
+                          <Plus size={12} />
+                          Adicionar
+                        </button>
+                      )}
+                    </div>
+                    <div className="text-sm text-gray-700">
+                      {displayData.fundadores.map((founder, index) => (
+                        <div key={index} className="mb-2">
+                          {isEditing ? (
+                            <div className="space-y-1 relative">
+                              {displayData.fundadores && displayData.fundadores.length > 1 && (
+                                <button
+                                  onClick={() => removeFounder(index)}
+                                  className="absolute -right-6 top-1 text-red-600 hover:text-red-800 transition-colors"
+                                  title="Remover fundador"
+                                >
+                                  <Minus size={14} />
+                                </button>
+                              )}
+                              <input
+                                type="text"
+                                value={founder.nome || ''}
+                                onChange={(e) => {
+                                  const updatedFounders = [...(editData.fundadores || [])];
+                                  updatedFounders[index] = { ...updatedFounders[index], nome: e.target.value };
+                                  setEditData(prev => ({ ...prev, fundadores: updatedFounders }));
+                                }}
+                                placeholder="Nome do fundador"
+                                className="w-full px-2 py-1 bg-white border border-gray-300 rounded text-gray-700 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
+                              />
+                              <input
+                                type="text"
+                                value={founder.formacao || ''}
+                                onChange={(e) => {
+                                  const updatedFounders = [...(editData.fundadores || [])];
+                                  updatedFounders[index] = { ...updatedFounders[index], formacao: e.target.value };
+                                  setEditData(prev => ({ ...prev, fundadores: updatedFounders }));
+                                }}
+                                placeholder="Formação"
+                                className="w-full px-2 py-1 bg-white border border-gray-300 rounded text-gray-700 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
+                              />
+                              <input
+                                type="text"
+                                value={founder.experiencia || ''}
+                                onChange={(e) => {
+                                  const updatedFounders = [...(editData.fundadores || [])];
+                                  updatedFounders[index] = { ...updatedFounders[index], experiencia: e.target.value };
+                                  setEditData(prev => ({ ...prev, fundadores: updatedFounders }));
+                                }}
+                                placeholder="Experiência"
+                                className="w-full px-2 py-1 bg-white border border-gray-300 rounded text-gray-700 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
+                              />
+                              <input
+                                type="text"
+                                value={founder.perfil || ''}
+                                onChange={(e) => {
+                                  const updatedFounders = [...(editData.fundadores || [])];
+                                  updatedFounders[index] = { ...updatedFounders[index], perfil: e.target.value };
+                                  setEditData(prev => ({ ...prev, fundadores: updatedFounders }));
+                                }}
+                                placeholder="Perfil adicional"
+                                className="w-full px-2 py-1 bg-white border border-gray-300 rounded text-gray-700 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
+                              />
+                            </div>
+                          ) : (
+                            <>
+                              <span className="font-semibold">• {formatValue(founder.nome)}: </span>
+                              {founder.formacao && (
+                                <span>formado em {founder.formacao}</span>
+                              )}
+                              {founder.experiencia && (
+                                <span>, com experiência em {founder.experiencia}</span>
+                              )}
+                              {founder.perfil && (
+                                <span>. {founder.perfil}</span>
+                              )}
+                            </>
+                          )}
+                        </div>
+                      ))}
+                    </div>
                   </div>
                   <div className="text-sm text-gray-700">
                     {displayData.fundadores.map((founder, index) => (
