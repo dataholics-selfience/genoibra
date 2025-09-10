@@ -4,13 +4,13 @@ import {
   Star, Calendar, Building2, MapPin, Users, Briefcase, Award, 
   Globe, Mail, ArrowLeft, Edit2, Save, X, Phone, Linkedin,
   User, Target, TrendingUp, DollarSign, CheckCircle, Download,
-  Box, Rocket, Plus, ExternalLink, Shield
+  Box, Rocket, Plus, ExternalLink, Shield, CreditCard
 } from 'lucide-react';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { db, auth } from '../firebase';
 import { StartupType } from '../types';
 import { useTranslation } from '../utils/i18n';
-import html2pdf from 'html2pdf.js';
+import StartupCardGenerator from './StartupCardGenerator';
 
 const formatValue = (value: any, fallback: string = 'Não informado'): string => {
   if (!value || value === 'NÃO DIVULGADO' || value === 'N/A' || value === '') {
@@ -30,13 +30,14 @@ const StartupDetailView = () => {
   const navigate = useNavigate();
   const { startupId } = useParams<{ startupId: string }>();
   const [startup, setStartup] = useState<StartupType | null>(null);
+  const [challengeTitle, setChallengeTitle] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
   const [editData, setEditData] = useState<StartupType | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
-  const [isExportingPDF, setIsExportingPDF] = useState(false);
+  const [showCardGenerator, setShowCardGenerator] = useState(false);
 
   useEffect(() => {
     const fetchStartup = async () => {
@@ -52,7 +53,9 @@ const StartupDetailView = () => {
           return;
         }
 
-        const startupData = startupDoc.data().startupData as StartupType;
+        const docData = startupDoc.data();
+        const startupData = docData.startupData as StartupType;
+        setChallengeTitle(docData.challengeTitle || 'Employee Experience e People Analytics');
         setStartup(startupData);
         setEditData(startupData);
       } catch (error) {
@@ -154,32 +157,6 @@ const StartupDetailView = () => {
     } : null);
   };
 
-  const exportToPDF = async () => {
-    setIsExportingPDF(true);
-    
-    try {
-      const element = document.getElementById('startup-detail-content');
-      if (!element) {
-        console.error('Element not found for PDF export');
-        return;
-      }
-
-      const opt = {
-        margin: 1,
-        filename: `${startup?.name.replace(/[^a-zA-Z0-9]/g, '_')}_startup_profile.pdf`,
-        image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { scale: 2, useCORS: true },
-        jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
-      };
-
-      await html2pdf().set(opt).from(element).save();
-    } catch (error) {
-      console.error('Error exporting PDF:', error);
-      setError('Erro ao exportar PDF');
-    } finally {
-      setIsExportingPDF(false);
-    }
-  };
 
   const handleBack = () => {
     navigate('/startups');
@@ -249,23 +226,18 @@ const StartupDetailView = () => {
             ) : (
               <>
                 <button
-                  onClick={exportToPDF}
-                  disabled={isExportingPDF}
-                  className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 text-white rounded-lg transition-colors"
-                >
-                  {isExportingPDF ? (
-                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  ) : (
-                    <Download size={16} />
-                  )}
-                  {isExportingPDF ? 'Gerando...' : 'Salvar PDF'}
-                </button>
-                <button
                   onClick={() => setIsEditing(true)}
                   className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
                 >
                   <Edit2 size={16} />
                   Editar
+                </button>
+                <button
+                  onClick={() => setShowCardGenerator(true)}
+                  className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors"
+                >
+                  <Download size={16} />
+                  Gerar Card
                 </button>
               </>
             )}
@@ -1015,6 +987,15 @@ const StartupDetailView = () => {
 
         </div>
       </div>
+
+      {/* Card Generator Modal */}
+      {showCardGenerator && startup && (
+        <StartupCardGenerator
+          startup={startup}
+          challengeTitle={challengeTitle}
+          onClose={() => setShowCardGenerator(false)}
+        />
+      )}
     </div>
   );
 };
