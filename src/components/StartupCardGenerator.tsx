@@ -1,97 +1,101 @@
 import { useState, useEffect } from 'react';
-import { Download, X, Edit2, Save, Upload, Check, Plus, Minus } from 'lucide-react';
+import { Download, X, Edit2, Save, Check, Plus, Minus } from 'lucide-react';
 import { StartupType } from '../types';
-import html2pdf from 'html2pdf.js';
-import { doc, updateDoc, collection, query, where, getDocs } from 'firebase/firestore';
+import { doc, updateDoc, collection, addDoc, query, where, orderBy, limit, getDocs } from 'firebase/firestore';
 import { db, auth } from '../firebase';
+import html2canvas from 'html2canvas';
+import jsPDF from 'jspdf';
+
 
 interface StartupCardGeneratorProps {
   startup: StartupType;
   challengeTitle: string;
   onClose: () => void;
-  startupId?: string;
+  startupId: string;
+  onStartupUpdated?: (updatedStartup: StartupType) => void;
 }
 
-const StartupCardGenerator = ({ startup, challengeTitle, onClose, startupId }: StartupCardGeneratorProps) => {
+const StartupCardGenerator = ({ startup, challengeTitle, onClose, startupId, onStartupUpdated }: StartupCardGeneratorProps) => {
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
-  const [editData, setEditData] = useState<StartupType>(startup);
-  const [logoFile, setLogoFile] = useState<string | null>(null);
+  const [editData, setEditData] = useState<StartupType>({ ...startup });
+  const [editChallengeTitle, setEditChallengeTitle] = useState(challengeTitle);
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [savedStartup, setSavedStartup] = useState<any>(null);
 
-  // Find the saved startup to get the correct ID
   useEffect(() => {
-    const findSavedStartup = async () => {
-      if (!auth.currentUser) return;
+    // Component initialization
+  }, []);
+
+  const handleLogoUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const base64 = e.target?.result as string;
+        setLogoPreview(base64);
+        handleEditChange('logoBase64', base64);
+        
+        // Auto-save logo to database immediately
+        saveLogo(base64);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const saveLogo = async (logoBase64: string) => {
+    if (!auth.currentUser || !startupId) return;
+
+    try {
+      console.log('💾 Salvando logo no banco de dados...');
       
-      try {
-        const q = query(
-          collection(db, 'selectedStartups'),
+      if (startupId.startsWith('temp-')) {
+        // Update startup list
+        const startupListsQuery = query(
+          collection(db, 'startupLists'),
           where('userId', '==', auth.currentUser.uid),
-          where('startupName', '==', startup.name)
+          orderBy('createdAt', 'desc'),
+          limit(1)
         );
-        const querySnapshot = await getDocs(q);
-        if (!querySnapshot.empty) {
-          const savedData = { id: querySnapshot.docs[0].id, ...querySnapshot.docs[0].data() };
-          setSavedStartup(savedData);
+        
+        const startupListSnapshot = await getDocs(startupListsQuery);
+        if (!startupListSnapshot.empty) {
+          const startupListDoc = startupListSnapshot.docs[0];
+          const startupListData = startupListDoc.data() as any;
+          
+          const updatedStartups = (startupListData.startups || []).map((s: any) => 
+            s.name === editData.name ? { ...s, logoBase64 } : s
+          );
+          
+          await updateDoc(doc(db, 'startupLists', startupListDoc.id), {
+            startups: updatedStartups,
+            updatedAt: new Date().toISOString()
+          });
         }
-      } catch (error) {
-        console.error('Error finding saved startup:', error);
+      } else {
+        // Update selected startup
+        await updateDoc(doc(db, 'selectedStartups', startupId), {
+          'startupData.logoBase64': logoBase64,
+          updatedAt: new Date().toISOString()
+        });
       }
-    };
-
-    findSavedStartup();
-  }, [startup.name]);
-
-  const formatValue = (value: any, fallback: string = 'NÃO DIVULGADO'): string => {
-    if (!value || value === 'NÃO DIVULGADO' || value === 'N/A' || value === '') {
-      return fallback;
+      
+      console.log('✅ Logo salvo com sucesso no banco de dados');
+    } catch (error) {
+      console.error('Erro ao salvar logo:', error);
     }
-    return String(value);
   };
 
-  const formatFounders = (): string => {
-    if (!startup.fundadores || startup.fundadores.length === 0) {
-      return formatValue(startup.founder, 'NÃO DIVULGADO');
-    }
-    
-    return startup.fundadores.map(founder => {
-      const parts = [];
-      if (founder.nome) parts.push(founder.nome);
-      if (founder.formacao) parts.push(`formado em ${founder.formacao}`);
-      if (founder.experiencia) parts.push(`com experiência em ${founder.experiencia}`);
-      return parts.join(': ');
-    }).join('\n• ');
-  };
-
-  const formatOpportunities = (): string => {
-    if (startup.oportunidades && Array.isArray(startup.oportunidades) && startup.oportunidades.length > 0) {
-      return startup.oportunidades
-        .filter(opp => opp && opp !== 'NÃO DIVULGADO')
-        .map((opp, index) => `${index + 1}. ${opp}`)
-        .join('\n\n');
-    }
-    
-    // Fallback para oportunidades genéricas baseadas na categoria/vertical
-    const genericOpportunities = [
-      `Análises prescritivas para decisões de sucessão, promoção e retenção.`,
-      `Estruturação de projetos de dados em RH com foco em desenvolvimento de talentos.`,
-      `Insights para engajamento e cultura organizacional.`
-    ];
-    
-    return genericOpportunities.map((opp, index) => `${index + 1}. ${opp}`).join('\n\n');
-  };
-
-  const handleInputChange = (field: string, value: string) => {
+  const handleEditChange = (field: string, value: any) => {
     if (field.includes('.')) {
       const [parent, child] = field.split('.');
       setEditData(prev => ({
         ...prev,
         [parent]: {
-          ...(prev as any)[parent],
+          ...(prev as any)[parent] || {},
           [child]: value
         }
       }));
@@ -103,116 +107,141 @@ const StartupCardGenerator = ({ startup, challengeTitle, onClose, startupId }: S
     }
   };
 
-  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        const result = event.target?.result as string;
-        setLogoFile(result);
-      };
-      reader.readAsDataURL(file);
+  const handleFounderChange = (index: number, field: string, value: string) => {
+    const updatedFounders = [...(editData.fundadores || [])];
+    if (!updatedFounders[index]) {
+      updatedFounders[index] = { nome: '', formacao: '', experiencia: '', perfil: '' };
     }
+    updatedFounders[index] = {
+      ...updatedFounders[index],
+      [field]: value
+    };
+    setEditData(prev => ({
+      ...prev,
+      fundadores: updatedFounders
+    }));
   };
 
-  const handleSave = async () => {
-    setError(null);
-    
-    const actualStartupId = startupId || savedStartup?.id;
-    
-    console.log('🔍 Debug save - startupId:', actualStartupId);
-    console.log('🔍 Debug save - savedStartup:', savedStartup);
-    console.log('🔍 Debug save - auth.currentUser:', auth.currentUser?.uid);
-    
-    if (!auth.currentUser) {
-      setError('Sessão expirada. Faça login novamente.');
-      return;
-    }
-    
-    if (!actualStartupId || actualStartupId.trim() === '') {
-      setError(`ID da startup não encontrado. startupId recebido: ${actualStartupId}`);
-      return;
-    }
+  const addFounder = () => {
+    setEditData(prev => ({
+      ...prev,
+      fundadores: [
+        ...(prev.fundadores || []),
+        { nome: '', formacao: '', experiencia: '', perfil: '' }
+      ]
+    }));
+  };
 
+  const removeFounder = (index: number) => {
+    setEditData(prev => ({
+      ...prev,
+      fundadores: (prev.fundadores || []).filter((_, i) => i !== index)
+    }));
+  };
+
+  // Função simplificada de salvamento - sempre cria nova entrada
+  const handleSave = async () => {
     setIsSaving(true);
+    setError('');
+    setSaveSuccess(false);
 
     try {
-      // Update the startupData field within the selectedStartups document
-      const updateData: any = {
-        startupData: {
-          ...editData,
-          logoBase64: logoFile || editData.logoBase64
-        },
-        updatedAt: new Date().toISOString()
-      };
+      // Check authentication first
+      if (!auth.currentUser) {
+        console.log('User not authenticated, redirecting to login');
+        window.location.href = '/login';
+        return;
+      }
 
-      await updateDoc(doc(db, 'selectedStartups', actualStartupId), updateData);
+      // Check if startupId is available
+      if (!startupId) {
+        throw new Error('ID da startup não encontrado');
+      }
 
+      console.log('Salvando dados da startup:', { startupId, hasEditData: !!editData });
+      
+      // Check if this is a temporary ID (startup not yet saved to pipeline)
+      if (startupId.startsWith('temp-')) {
+        console.log('Temporary ID detected, saving to startup list instead');
+        
+        // Find the startup list document and update the specific startup
+        const startupListsQuery = query(
+          collection(db, 'startupLists'),
+          where('userId', '==', auth.currentUser.uid),
+          orderBy('createdAt', 'desc'),
+          limit(1)
+        );
+        
+        const startupListSnapshot = await getDocs(startupListsQuery);
+        if (!startupListSnapshot.empty) {
+          const startupListDoc = startupListSnapshot.docs[0];
+          const startupListData = startupListDoc.data() as any;
+          
+          // Update the specific startup in the array
+          const updatedStartups = (startupListData.startups || []).map((s: any) => 
+            s.name === editData.name ? editData : s
+          );
+          
+          await updateDoc(doc(db, 'startupLists', startupListDoc.id), {
+            startups: updatedStartups,
+            updatedAt: new Date().toISOString()
+          });
+          
+          console.log('Startup updated in startup list');
+        }
+      } else {
+        // This is a real ID from selectedStartups collection
+        await updateDoc(doc(db, 'selectedStartups', startupId), {
+          startupData: editData,
+          updatedAt: new Date().toISOString()
+        });
+        
+        console.log('Startup updated in selected startups');
+      }
+
+      // Update local state to reflect changes immediately
+      console.log('🔄 Updating local state with saved data');
+      
+      // Notify parent component about the update
+      if (onStartupUpdated) {
+        console.log('📢 Notifying parent component of startup update:', editData.name);
+        onStartupUpdated(editData);
+      }
+      
+      setIsEditing(false);
       setSaveSuccess(true);
-      setTimeout(() => {
-        setSaveSuccess(false);
-        setIsEditing(false);
-        setError(null);
-      }, 2000);
+      setTimeout(() => setSaveSuccess(false), 3000);
+      
+      console.log('✅ Save operation completed successfully');
 
     } catch (error) {
-      console.error('Erro ao salvar alterações:', error);
-      setError('Erro ao salvar alterações. Tente novamente.');
+      console.error('Error updating startup:', error);
+      setError(`Erro ao salvar alterações: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
     } finally {
       setIsSaving(false);
     }
   };
 
-  const addFounder = () => {
-    const newFounder = { nome: '', formacao: '', experiencia: '', perfil: '' };
-    const currentFounders = editData.fundadores || [];
-    setEditData(prev => ({
-      ...prev,
-      fundadores: [...currentFounders, newFounder]
-    }));
+  // Update displayData to use editData when editing is complete
+  const displayData = editData;
+
+  const formatValue = (value: any, fallback: string = 'NÃO DIVULGADO'): string => {
+    if (!value || value === 'NÃO DIVULGADO' || value === 'N/A' || value === '') {
+      return fallback;
+    }
+    return String(value);
   };
 
-  const removeFounder = (index: number) => {
-    const currentFounders = editData.fundadores || [];
-    if (currentFounders.length > 1) {
-      const updatedFounders = currentFounders.filter((_, i) => i !== index);
-      setEditData(prev => ({
-        ...prev,
-        fundadores: updatedFounders
-      }));
-    }
-  };
-
-  const displayData = isEditing ? editData : startup;
-
-  const formatFoundersSection = (): JSX.Element => {
-    if (!startup.fundadores || startup.fundadores.length === 0) {
-      return (
-        <div className="mb-2">
-          <span className="font-semibold">• {formatValue(startup.founder)}</span>
-        </div>
-      );
-    }
+  const formatOpportunities = (): string => {
+    const genericOpportunities = [
+      `Análises prescritivas para decisões de sucessão, promoção e retenção.`,
+      `Estruturação de projetos de dados em RH com foco em desenvolvimento de talentos.`,
+      `Insights para engajamento e cultura organizacional.`
+    ];
     
-    return (
-      <>
-        {startup.fundadores.map((founder, index) => (
-          <div key={index} className="mb-2">
-            <span className="font-semibold">• {formatValue(founder.nome)}: </span>
-            {founder.formacao && (
-              <span>formado em {founder.formacao}</span>
-            )}
-            {founder.experiencia && (
-              <span>, com experiência em {founder.experiencia}</span>
-            )}
-            {founder.perfil && (
-              <span>. {founder.perfil}</span>
-            )}
-          </div>
-        ))}
-      </>
-    );
+    return genericOpportunities.map((opp, index) => `${index + 1}. ${opp}`).join('\n\n');
   };
+
 
   const exportToPDF = async () => {
     setIsGeneratingPDF(true);
@@ -221,36 +250,77 @@ const StartupCardGenerator = ({ startup, challengeTitle, onClose, startupId }: S
       const cardElement = document.getElementById('startup-card-content');
       if (!cardElement) {
         console.error('Card element not found');
+        setError('Elemento do card não encontrado');
         return;
       }
 
-      const opt = {
-        margin: 0.5,
-        filename: `${startup.name.replace(/[^a-zA-Z0-9]/g, '_')}_card.pdf`,
-        image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { 
-          scale: 2, 
-          useCORS: true,
-          allowTaint: true,
-          backgroundColor: '#ffffff',
-          width: 1200,
-          height: 800,
-          logging: false,
-          removeContainer: true
-        },
-        jsPDF: { 
-          unit: 'in', 
-          format: [11.69, 8.27], // A4 landscape
-          orientation: 'landscape' 
+      console.log('🎨 Gerando canvas do card...');
+      
+      // Generate high-quality canvas
+      const canvas = await html2canvas(cardElement, {
+        scale: 2, // High resolution
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: '#ffffff',
+        width: 1200,
+        height: 800,
+        scrollX: 0,
+        scrollY: 0,
+        logging: false,
+        onclone: (clonedDoc) => {
+          // Ensure all images are loaded in the cloned document
+          const images = clonedDoc.querySelectorAll('img');
+          images.forEach((img) => {
+            img.style.display = 'block';
+            // Force load external images for PDF
+            if (img.src.includes('genoi.net')) {
+              img.crossOrigin = 'anonymous';
+            }
+          });
         }
-      };
+      });
 
-      await html2pdf().set(opt).from(cardElement).save();
+      console.log('📄 Criando PDF...');
+      
+      // Create PDF in landscape format
+      const pdf = new jsPDF({
+        orientation: 'landscape',
+        unit: 'mm',
+        format: 'a4'
+      });
+
+      // Calculate dimensions to fit A4 landscape
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = pdf.internal.pageSize.getHeight();
+      
+      // Add canvas to PDF
+      const imgData = canvas.toDataURL('image/png');
+      pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+
+      // Generate filename
+      const fileName = `${displayData.name.replace(/[^a-zA-Z0-9]/g, '_')}_card.pdf`;
+      
+      console.log('💾 Fazendo download do PDF...');
+      
+      // Download PDF
+      pdf.save(fileName);
+      
+      console.log('✅ PDF gerado e baixado com sucesso!');
+      
     } catch (error) {
-      console.error('Error exporting PDF:', error);
+      console.error('Error generating PDF:', error);
+      setError('Erro ao gerar PDF. Tente novamente.');
     } finally {
       setIsGeneratingPDF(false);
     }
+  };
+
+  const cancelEdit = () => {
+    setIsEditing(false);
+    setEditData({ ...startup });
+    setEditChallengeTitle(challengeTitle);
+    setLogoPreview(null);
+    setError(null);
   };
 
   return (
@@ -264,6 +334,12 @@ const StartupCardGenerator = ({ startup, challengeTitle, onClose, startupId }: S
               <div className="flex items-center gap-2 text-red-600 bg-red-50 px-3 py-1 rounded-lg">
                 <X size={16} />
                 <span className="text-sm">{error}</span>
+                <button 
+                  onClick={() => setError(null)}
+                  className="text-red-800 hover:text-red-900"
+                >
+                  <X size={12} />
+                </button>
               </div>
             )}
             {saveSuccess && (
@@ -276,9 +352,9 @@ const StartupCardGenerator = ({ startup, challengeTitle, onClose, startupId }: S
               <>
                 <button
                   onClick={handleSave}
-                  disabled={isSaving}
+                  disabled={isSaving || !startupId}
                   className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors ${
-                    isSaving
+                    isSaving || !startupId
                       ? 'bg-gray-400 text-gray-600 cursor-not-allowed'
                       : 'bg-green-600 hover:bg-green-700 text-white'
                   }`}
@@ -291,17 +367,12 @@ const StartupCardGenerator = ({ startup, challengeTitle, onClose, startupId }: S
                   ) : (
                     <>
                       <Save size={16} />
-                      Salvar
+                      {!startupId ? 'ID não encontrado' : 'Salvar'}
                     </>
                   )}
                 </button>
                 <button
-                  onClick={() => {
-                    setIsEditing(false);
-                    setEditData(startup);
-                    setLogoFile(null);
-                    setError(null);
-                  }}
+                  onClick={cancelEdit}
                   className="flex items-center gap-2 px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg font-medium transition-colors"
                 >
                   <X size={16} />
@@ -309,15 +380,13 @@ const StartupCardGenerator = ({ startup, challengeTitle, onClose, startupId }: S
                 </button>
               </>
             ) : (
-              <>
-                <button
-                  onClick={() => setIsEditing(true)}
-                  className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors"
-                >
-                  <Edit2 size={16} />
-                  Editar
-                </button>
-              </>
+              <button
+                onClick={() => setIsEditing(true)}
+                className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors"
+              >
+                <Edit2 size={16} />
+                Editar
+              </button>
             )}
             <button
               onClick={exportToPDF}
@@ -358,7 +427,7 @@ const StartupCardGenerator = ({ startup, challengeTitle, onClose, startupId }: S
               width: '1200px', 
               height: '800px',
               fontFamily: 'Arial, sans-serif',
-              fontSize: '14px',
+              fontSize: '16.1px',
               lineHeight: '1.4',
               position: 'relative',
               margin: '0 auto'
@@ -368,18 +437,24 @@ const StartupCardGenerator = ({ startup, challengeTitle, onClose, startupId }: S
             <div className="bg-white p-6 border-b border-gray-200">
               <div className="flex justify-between items-center">
                 <h1 className="text-2xl font-bold text-red-600">
-                  {challengeTitle || 'Employee Experience e People Analytics'}
+                  {isEditing ? (
+                    <input
+                      type="text"
+                      value={editChallengeTitle}
+                      onChange={(e) => setEditChallengeTitle(e.target.value)}
+                      className="text-2xl font-bold bg-white border border-gray-300 rounded px-2 py-1 text-red-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  ) : (
+                    challengeTitle || 'Employee Experience e People Analytics'
+                  )}
                 </h1>
                 <div className="flex items-center gap-6">
-                  <div style={{ height: '40px', display: 'flex', alignItems: 'center', gap: '20px' }}>
-
-                    <img 
-                      src="https://genoi.net/wp-content/uploads/2025/09/logo-inovabra-bradesco.png" 
-                      alt="Inovabra Bradesco" 
-                      style={{ height: '40px', width: 'auto', objectFit: 'contain' }}
-                      crossOrigin="anonymous"
-                    />
-                  </div>
+                  <img 
+                    src={INOVABRA_LOGO}
+                    alt="Inovabra Bradesco" 
+                    style={{ height: '44.5px', width: 'auto', objectFit: 'contain' }}
+                    crossOrigin="anonymous"
+                  />
                 </div>
               </div>
             </div>
@@ -389,18 +464,42 @@ const StartupCardGenerator = ({ startup, challengeTitle, onClose, startupId }: S
               <div className="grid grid-cols-12 gap-6 mb-6">
                 {/* Left Column - Logo and Basic Info */}
                 <div className="col-span-3">
-                  {/* Logo Placeholder */}
-                  <div className="w-16 h-16 mb-4">
-                    {startup.logoBase64 ? (
+                  {/* Logo */}
+                  <div className={`mb-4 ${isEditing ? 'relative -top-9' : ''}`} style={{ width: '184px', height: '184px' }}>
+                    {isEditing ? (
+                      <div className="space-y-2">
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handleLogoUpload}
+                          className="text-xs text-gray-600 w-full mb-2"
+                        />
+                        <div className="border-2 border-dashed border-gray-400 rounded flex items-center justify-center" style={{ width: '184px', height: '184px' }}>
+                          {logoPreview || displayData.logoBase64 ? (
+                            <img 
+                              src={logoPreview || displayData.logoBase64} 
+                              alt="Logo" 
+                             className="rounded"
+                             style={{ maxWidth: '184px', maxHeight: '184px', width: 'auto', height: 'auto', objectFit: 'contain' }}
+                             crossOrigin="anonymous"
+                            />
+                          ) : (
+                            <span className="text-gray-500 text-xs">Logo</span>
+                          )}
+                        </div>
+                      </div>
+                    ) : displayData.logoBase64 ? (
                       <img 
-                        src={startup.logoBase64} 
+                        src={displayData.logoBase64} 
                         alt="Logo" 
-                        className="w-16 h-16 object-contain"
+                       className="rounded"
+                       style={{ maxWidth: '184px', maxHeight: '184px', width: 'auto', height: 'auto', objectFit: 'contain' }}
+                       crossOrigin="anonymous"
                       />
                     ) : (
-                      <div className="w-16 h-16 bg-red-600 rounded-full flex items-center justify-center">
-                        <span className="text-white font-bold text-xl">
-                          {startup.name.charAt(0).toUpperCase()}
+                      <div className="bg-red-600 rounded-full flex items-center justify-center" style={{ width: '184px', height: '184px' }}>
+                        <span className="text-white font-bold" style={{ fontSize: '74px' }}>
+                          {displayData.name?.charAt(0)?.toUpperCase() || 'S'}
                         </span>
                       </div>
                     )}
@@ -410,33 +509,73 @@ const StartupCardGenerator = ({ startup, challengeTitle, onClose, startupId }: S
                   <div className="space-y-2 text-sm">
                     <div>
                       <span className="font-bold text-gray-800">NOME: </span>
-                      <span className="text-gray-700">{startup.name}</span>
+                      {isEditing ? (
+                        <input
+                          type="text"
+                          value={editData.name || ''}
+                          onChange={(e) => handleEditChange('name', e.target.value)}
+                          className="w-full bg-white border border-gray-300 rounded px-2 py-1 text-gray-700 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                      ) : (
+                        <span className="text-gray-700">{displayData.name}</span>
+                      )}
                     </div>
                     <div>
                       <span className="font-bold text-gray-800">SITE: </span>
-                      <span className="text-blue-600">{formatValue(startup.website)}</span>
+                      {isEditing ? (
+                        <input
+                          type="url"
+                          value={editData.website || ''}
+                          onChange={(e) => handleEditChange('website', e.target.value)}
+                          className="w-full bg-white border border-gray-300 rounded px-2 py-1 text-blue-600 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                      ) : (
+                        <span className="text-blue-600">{formatValue(displayData.website)}</span>
+                      )}
                     </div>
                     <div>
                       <span className="font-bold text-gray-800">SEDE: </span>
-                      <span className="text-gray-700">
-                        {formatValue(startup.city)}
-                        {startup.state && startup.state !== 'NÃO DIVULGADO' && `, ${startup.state}`}
-                      </span>
+                      {isEditing ? (
+                        <div className="space-y-1">
+                          <input
+                            type="text"
+                            value={editData.city || ''}
+                            onChange={(e) => handleEditChange('city', e.target.value)}
+                            placeholder="Cidade"
+                            className="w-full bg-white border border-gray-300 rounded px-2 py-1 text-gray-700 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
+                          />
+                          <input
+                            type="text"
+                            value={editData.state || ''}
+                            onChange={(e) => handleEditChange('state', e.target.value)}
+                            placeholder="Estado"
+                            className="w-full bg-white border border-gray-300 rounded px-2 py-1 text-gray-700 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
+                          />
+                        </div>
+                      ) : (
+                        <span className="text-gray-700">
+                          {formatValue(displayData.city)}
+                          {displayData.state && displayData.state !== 'NÃO DIVULGADO' && `, ${displayData.state}`}
+                        </span>
+                      )}
                     </div>
                     <div>
                       <span className="font-bold text-gray-800">FUNDADOR: </span>
-                      <span className="text-gray-700">
-                        {startup.fundadores && startup.fundadores.length > 0 
-                          ? startup.fundadores.map(f => f.nome).filter(n => n).join(', ')
-                          : formatValue(startup.founder)
-                        }
-                      </span>
-                    </div>
-                    <div>
-                      <span className="font-bold text-gray-800">PORTE: </span>
-                      <span className="text-gray-700">
-                        {formatValue(startup.solution?.porte || startup.teamSize)}
-                      </span>
+                      {isEditing ? (
+                        <input
+                          type="text"
+                          value={editData.founder || ''}
+                          onChange={(e) => handleEditChange('founder', e.target.value)}
+                          className="w-full bg-white border border-gray-300 rounded px-2 py-1 text-gray-700 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                      ) : (
+                        <span className="text-gray-700">
+                          {displayData.fundadores && displayData.fundadores.length > 0 
+                            ? displayData.fundadores.map(f => f.nome).filter(n => n).join(', ')
+                            : formatValue(displayData.founder)
+                          }
+                        </span>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -444,46 +583,58 @@ const StartupCardGenerator = ({ startup, challengeTitle, onClose, startupId }: S
                 {/* Middle Column - Financial Info */}
                 <div className="col-span-5 space-y-2 text-sm">
                   <br />
+                  <br />                  
                   <br />
                   <br />
+                  <br />                  
                   <br />
                   <br />
+                  <br />                  
                   <br />
                   <div>
                     <span className="font-bold text-gray-800">INVESTIMENTOS: </span>
-                    <span className="text-gray-700">
-                      {formatValue(startup.solution?.investimentos)}
-                    </span>
-                  </div>
-                  <div>
-                    <span className="font-bold text-gray-800">RECEBEU APORTE: </span>
-                    <span className="text-gray-700">
-                      {formatValue(startup.solution?.recebeuAporte)}
-                    </span>
+                    {isEditing ? (
+                      <input
+                        type="text"
+                        value={editData.solution?.investimentos || ''}
+                        onChange={(e) => handleEditChange('solution.investimentos', e.target.value)}
+                        className="w-full bg-white border border-gray-300 rounded px-2 py-1 text-gray-700 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    ) : (
+                      <span className="text-gray-700">
+                        {formatValue(displayData.solution?.investimentos)}
+                      </span>
+                    )}
                   </div>
                   <div>
                     <span className="font-bold text-gray-800">STAGE: </span>
-                    <span className="text-gray-700">
-                      {formatValue(startup.stage || startup.solution?.stage)}
-                    </span>
+                    {isEditing ? (
+                      <input
+                        type="text"
+                        value={editData.stage || editData.solution?.stage || ''}
+                        onChange={(e) => handleEditChange('stage', e.target.value)}
+                        className="w-full bg-white border border-gray-300 rounded px-2 py-1 text-gray-700 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    ) : (
+                      <span className="text-gray-700">
+                        {formatValue(displayData.stage || displayData.solution?.stage)}
+                      </span>
+                    )}
                   </div>
                   <div>
-                    <span className="font-bold text-gray-800">VALUATION: </span>
-                    <span className="text-gray-700">
-                      {formatValue(startup.solution?.valuation)}
-                    </span>
-                  </div>
-                  <div>
-                    <span className="font-bold text-gray-800">PRINCIPAIS CLIENTES: </span>
-                    <span className="text-gray-700">
-                      {formatValue(startup.solution?.principaisClientes)}
-                    </span>
-                  </div>
-                  <div>
-                    <span className="font-bold text-gray-800">NÚMEROS DE COLABORADORES: </span>
-                    <span className="text-gray-700">
-                      {formatValue(startup.solution?.numeroColaboradores || startup.employees)}
-                    </span>
+                    <span className="font-bold text-gray-800">COLABORADORES: </span>
+                    {isEditing ? (
+                      <input
+                        type="text"
+                        value={editData.employees || ''}
+                        onChange={(e) => handleEditChange('employees', e.target.value)}
+                        className="w-full bg-white border border-gray-300 rounded px-2 py-1 text-gray-700 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    ) : (
+                      <span className="text-gray-700">
+                        {formatValue(displayData.employees)}
+                      </span>
+                    )}
                   </div>
                 </div>
 
@@ -502,16 +653,25 @@ const StartupCardGenerator = ({ startup, challengeTitle, onClose, startupId }: S
               <div className="mb-6">
                 <div className="bg-gray-50 rounded-lg p-4">
                   <h3 className="text-lg font-bold text-gray-800 mb-3">SOLUÇÃO</h3>
-                  <p className="text-sm text-gray-700 leading-relaxed">
-                    {startup.description.length > 400 
-                      ? `${startup.description.substring(0, 400)}...`
-                      : startup.description
-                    }
-                  </p>
+                  {isEditing ? (
+                    <textarea
+                      value={editData.description || ''}
+                      onChange={(e) => handleEditChange('description', e.target.value)}
+                      className="w-full bg-white border border-gray-300 rounded px-3 py-2 text-gray-700 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      rows={4}
+                    />
+                  ) : (
+                    <p className="text-sm text-gray-700 leading-relaxed">
+                      {displayData.description && displayData.description.length > 400 
+                        ? `${displayData.description.substring(0, 400)}...`
+                        : displayData.description || 'Descrição não disponível'
+                      }
+                    </p>
+                  )}
                 </div>
               </div>
 
-              {/* Founders Section */}
+              {/* Founders */}
               {displayData.fundadores && displayData.fundadores.length > 0 && (
                 <div className="mb-6">
                   <div className="flex items-center justify-between mb-3">
@@ -526,78 +686,51 @@ const StartupCardGenerator = ({ startup, challengeTitle, onClose, startupId }: S
                       </button>
                     )}
                   </div>
-                  <div className="text-sm text-gray-700">
+                  <div className="text-sm text-gray-700 leading-relaxed">
                     {displayData.fundadores.map((founder, index) => (
-                      <div key={index} className="mb-2">
+                      <div key={index} className="mb-2 relative">
                         {isEditing ? (
-                          <div className="space-y-1 relative">
+                          <div className="space-y-1 border border-gray-300 rounded p-2 relative">
                             {displayData.fundadores && displayData.fundadores.length > 1 && (
                               <button
                                 onClick={() => removeFounder(index)}
-                                className="absolute -right-6 top-1 text-red-600 hover:text-red-800 transition-colors"
-                                title="Remover fundador"
+                                className="absolute -top-2 -right-2 w-5 h-5 bg-red-600 hover:bg-red-700 text-white rounded-full flex items-center justify-center text-xs transition-colors"
                               >
-                                <Minus size={14} />
+                                <Minus size={10} />
                               </button>
                             )}
                             <input
                               type="text"
                               value={founder.nome || ''}
-                              onChange={(e) => {
-                                const updatedFounders = [...(editData.fundadores || [])];
-                                updatedFounders[index] = { ...updatedFounders[index], nome: e.target.value };
-                                setEditData(prev => ({ ...prev, fundadores: updatedFounders }));
-                              }}
+                              onChange={(e) => handleFounderChange(index, 'nome', e.target.value)}
                               placeholder="Nome do fundador"
                               className="w-full px-2 py-1 bg-white border border-gray-300 rounded text-gray-700 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
                             />
                             <input
                               type="text"
                               value={founder.formacao || ''}
-                              onChange={(e) => {
-                                const updatedFounders = [...(editData.fundadores || [])];
-                                updatedFounders[index] = { ...updatedFounders[index], formacao: e.target.value };
-                                setEditData(prev => ({ ...prev, fundadores: updatedFounders }));
-                              }}
+                              onChange={(e) => handleFounderChange(index, 'formacao', e.target.value)}
                               placeholder="Formação"
                               className="w-full px-2 py-1 bg-white border border-gray-300 rounded text-gray-700 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
                             />
                             <input
                               type="text"
                               value={founder.experiencia || ''}
-                              onChange={(e) => {
-                                const updatedFounders = [...(editData.fundadores || [])];
-                                updatedFounders[index] = { ...updatedFounders[index], experiencia: e.target.value };
-                                setEditData(prev => ({ ...prev, fundadores: updatedFounders }));
-                              }}
+                              onChange={(e) => handleFounderChange(index, 'experiencia', e.target.value)}
                               placeholder="Experiência"
-                              className="w-full px-2 py-1 bg-white border border-gray-300 rounded text-gray-700 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
-                            />
-                            <input
-                              type="text"
-                              value={founder.perfil || ''}
-                              onChange={(e) => {
-                                const updatedFounders = [...(editData.fundadores || [])];
-                                updatedFounders[index] = { ...updatedFounders[index], perfil: e.target.value };
-                                setEditData(prev => ({ ...prev, fundadores: updatedFounders }));
-                              }}
-                              placeholder="Perfil adicional"
                               className="w-full px-2 py-1 bg-white border border-gray-300 rounded text-gray-700 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
                             />
                           </div>
                         ) : (
-                          <>
-                            <span className="font-semibold">• {formatValue(founder.nome)}: </span>
+                          <div>
+                            <strong>{founder.nome}</strong>
                             {founder.formacao && (
-                              <span>formado em {founder.formacao}</span>
+                              <span>, formado em {founder.formacao}</span>
                             )}
                             {founder.experiencia && (
-                              <span>, com experiência em {founder.experiencia}</span>
+                              <span>. {founder.experiencia}</span>
                             )}
-                            {founder.perfil && (
-                              <span>. {founder.perfil}</span>
-                            )}
-                          </>
+                          </div>
                         )}
                       </div>
                     ))}

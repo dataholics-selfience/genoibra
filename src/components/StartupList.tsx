@@ -203,7 +203,7 @@ const StartupCard = ({
   challengeId: string;
   onStartupSaved: () => void;
   onStartupUpdated: (updatedStartup: StartupType) => void;
-  onGenerateCard: (startup: StartupType, challengeTitle: string) => void;
+  onGenerateCard: (startup: StartupType & { id: string }, challengeTitle: string) => void;
 }) => {
   const { t } = useTranslation();
   const [isSaving, setIsSaving] = useState(false);
@@ -331,7 +331,12 @@ const StartupCard = ({
 
   const handleGenerateCard = (e: React.MouseEvent) => {
     e.stopPropagation();
-    onGenerateCard(displayData, challengeTitle);
+    // Pass the savedStartup ID if available, otherwise use a temporary ID
+    const startupWithId = {
+      ...displayData,
+      id: savedStartup?.id || `temp-${Date.now()}`
+    };
+    onGenerateCard(startupWithId, challengeTitle);
   };
 
   const getCurrentStage = () => {
@@ -648,7 +653,7 @@ const StartupDetailCard = ({
   const [isEditing, setIsEditing] = useState(false);
   const [editData, setEditData] = useState<StartupType>(startup);
   const [isExportingPDF, setIsExportingPDF] = useState(false);
-  const [showCardGenerator, setShowCardGenerator] = useState<{startup: StartupType, challengeTitle: string} | null>(null);
+  const [showCardGenerator, setShowCardGenerator] = useState<{startup: StartupType, challengeTitle: string, startupId: string} | null>(null);
 
   useEffect(() => {
     const checkIfSaved = async () => {
@@ -866,7 +871,11 @@ const StartupDetailCard = ({
         <div className="flex flex-col items-end gap-2">
           <div className="flex gap-2">
             <button
-              onClick={() => setShowCardGenerator({ startup: displayData, challengeTitle: 'Desafio' })}
+              onClick={() => setShowCardGenerator({ 
+                startup: displayData, 
+                challengeTitle: 'Desafio',
+                startupId: savedStartup?.id || `temp-${Date.now()}`
+              })}
               className="text-gray-400 hover:text-white p-1 rounded"
               title="Gerar Card"
             >
@@ -1494,7 +1503,8 @@ const StartupDetailCard = ({
         <StartupCardGenerator
           startup={showCardGenerator.startup}
           challengeTitle={showCardGenerator.challengeTitle}
-          startupId={showCardGenerator.startup.id || ''}
+          startupId={showCardGenerator.startupId}
+          onStartupUpdated={onStartupUpdated}
           onClose={() => setShowCardGenerator(null)}
         />
       )}
@@ -1509,7 +1519,7 @@ const StartupList = () => {
   const [selectedStartup, setSelectedStartup] = useState<StartupType | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
   const [editableStartups, setEditableStartups] = useState<StartupType[]>([]);
-  const [showCardGenerator, setShowCardGenerator] = useState<{ startup: StartupType; challengeTitle: string } | null>(null);
+  const [showCardGenerator, setShowCardGenerator] = useState<{ startup: StartupType; challengeTitle: string; startupId: string } | null>(null);
 
   useEffect(() => {
     const fetchStartupData = async () => {
@@ -1535,44 +1545,35 @@ const StartupList = () => {
   }, []);
 
   const handleStartupUpdated = (updatedStartup: StartupType) => {
+    console.log('🔄 Updating startup in local state:', updatedStartup.name);
+    
+    // Update editableStartups array
+    console.log('🔄 Updating startup in local state:', updatedStartup.name);
+    
     setEditableStartups(prev => 
       prev.map(startup => 
         startup.name === updatedStartup.name ? updatedStartup : startup
       )
     );
     
+    // Update selectedStartup if it's the same one
     if (selectedStartup && selectedStartup.name === updatedStartup.name) {
       setSelectedStartup(updatedStartup);
     }
 
-    // Update in database
-    if (startupData) {
-      const updatedStartupList = {
-        ...startupData,
-        startups: editableStartups.map(startup => 
+    // Update startupData state as well
+    setRefreshKey(prev => prev + 1);
+      setStartupData(prev => prev ? {
+        ...prev,
+        startups: prev.startups?.map(startup => 
           startup.name === updatedStartup.name ? updatedStartup : startup
-        )
-      };
-      
-      updateDoc(doc(db, 'startupLists', startupData.id), {
-        startups: updatedStartupList.startups,
-        updatedAt: new Date().toISOString()
-      }).catch(error => {
-        console.error('Error updating startup list:', error);
-      });
-    }
-  };
-
-  const handleStartupClick = (startup: StartupType) => {
-    setSelectedStartup(startup);
-  };
-
-  const handleBack = () => {
-    if (selectedStartup) {
-      setSelectedStartup(null);
-    } else {
-      navigate(-1);
-    }
+        ) || []
+      } : null);
+    
+    // Force re-render
+    setRefreshKey(prev => prev + 1);
+    
+    console.log('✅ Local state updated for startup:', updatedStartup.name);
   };
 
   const handleStartupSaved = () => {
@@ -1580,7 +1581,68 @@ const StartupList = () => {
   };
 
   const handleGenerateCard = (startup: StartupType, challengeTitle: string) => {
-    setShowCardGenerator({ startup, challengeTitle });
+    // Find the saved startup ID if it exists
+    const findStartupId = async () => {
+      if (!auth.currentUser) return `temp-${Date.now()}`;
+      
+      try {
+        const q = query(
+          collection(db, 'selectedStartups'),
+          where('userId', '==', auth.currentUser.uid),
+          where('startupName', '==', startup.name)
+        );
+        const querySnapshot = await getDocs(q);
+        
+        if (!querySnapshot.empty) {
+          return querySnapshot.docs[0].id;
+        }
+        
+        return `temp-${Date.now()}`;
+      } catch (error) {
+        console.error('Error finding startup ID:', error);
+        return `temp-${Date.now()}`;
+      }
+    };
+    
+    findStartupId().then(id => {
+      setShowCardGenerator({ 
+        startup: { ...startup, id }, 
+        challengeTitle,
+        startupId: id
+      });
+    });
+    const findSavedStartupId = async () => {
+      if (!auth.currentUser) return null;
+      
+      try {
+        const q = query(
+          collection(db, 'selectedStartups'),
+          where('userId', '==', auth.currentUser.uid),
+          where('startupName', '==', startup.name)
+        );
+        const querySnapshot = await getDocs(q);
+        return querySnapshot.empty ? null : querySnapshot.docs[0].id;
+      } catch (error) {
+        console.error('Error finding saved startup:', error);
+        return null;
+      }
+    };
+
+    findSavedStartupId().then(savedId => {
+      setShowCardGenerator({ 
+        startup: { ...startup, id: savedId || `temp-${Date.now()}` }, 
+        challengeTitle,
+        startupId: savedId || `temp-${Date.now()}`
+      });
+    });
+  };
+
+  const handleBack = () => {
+    navigate('/');
+  };
+
+  const handleStartupClick = (startup: StartupType) => {
+    setSelectedStartup(startup);
   };
 
   if (!startupData) {
@@ -1618,7 +1680,8 @@ const StartupList = () => {
           <StartupCardGenerator
             startup={showCardGenerator.startup}
             challengeTitle={showCardGenerator.challengeTitle}
-            startupId={showCardGenerator.startup.id || ''}
+            startupId={showCardGenerator.startupId}
+            onStartupUpdated={handleStartupUpdated}
             onClose={() => setShowCardGenerator(null)}
           />
         )}
@@ -1688,7 +1751,8 @@ const StartupList = () => {
         <StartupCardGenerator
           startup={showCardGenerator.startup}
           challengeTitle={showCardGenerator.challengeTitle}
-          startupId={showCardGenerator.startup.id || ''}
+          startupId={showCardGenerator.startupId}
+          onStartupUpdated={handleStartupUpdated}
           onClose={() => setShowCardGenerator(null)}
         />
       )}

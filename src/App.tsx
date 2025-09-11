@@ -20,6 +20,7 @@ import TokenRegister from './components/auth/TokenRegister';
 import SlugRegister from './components/auth/SlugRegister';
 import PublicChallenge from './components/PublicChallenge';
 import LoginVerification from './components/auth/LoginVerification';
+import StartupDetailView from './components/StartupDetailView';
 import { needsLoginVerification, clearVerificationState } from './utils/verificationStateManager';
 
 function App() {
@@ -126,6 +127,7 @@ function App() {
         <Route path="/new-challenge" element={user ? <NewChallenge /> : <Navigate to="/login" replace />} />
         <Route path="/startups" element={user ? <StartupList /> : <Navigate to="/login" replace />} />
         <Route path="/saved-startups" element={user ? <SavedStartups /> : <Navigate to="/login" replace />} />
+        <Route path="/startup/:startupId" element={user ? <StartupDetailView /> : <Navigate to="/login" replace />} />
         <Route path="/account-deleted" element={<AccountDeleted />} />
         
         {/* Admin Route - Only for contact@dataholics.io */}
