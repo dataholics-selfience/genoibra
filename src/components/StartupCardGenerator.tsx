@@ -6,6 +6,9 @@ import { db, auth } from '../firebase';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 
+// Import the Inovabra logo
+const INOVABRA_LOGO = '/inovabra-bradesco-new.png';
+
 
 interface StartupCardGeneratorProps {
   startup: StartupType;
