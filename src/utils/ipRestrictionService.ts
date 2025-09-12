@@ -7,7 +7,7 @@ export interface AllowedIP {
   description?: string;
   addedBy: string;
   addedAt: string;
-  type: 'ipv4' | 'ipv6';
+  type: 'ipv4' | 'ipv6' | 'ipv4_range' | 'ipv6_range';
   active: boolean;
 }
 
@@ -296,10 +296,49 @@ export class IPRestrictionService {
   /**
    * Detecta tipo de IP
    */
-  static detectIPType(ip: string): 'ipv4' | 'ipv6' | 'invalid' {
+  private static detectIPType(ip: string): 'ipv4' | 'ipv6' | 'ipv4_range' | 'ipv6_range' | 'invalid' {
     if (!ip) return 'invalid';
     
     const cleanIP = ip.trim();
+    
+    // Check for CIDR notation (ranges)
+    if (cleanIP.includes('/')) {
+      const [ipPart, prefixPart] = cleanIP.split('/');
+      const prefix = parseInt(prefixPart);
+      
+      // Validate prefix length
+      if (isNaN(prefix)) return 'invalid';
+      
+      // IPv4 CIDR (e.g., 192.168.1.0/24)
+      const ipv4Pattern = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/;
+      const ipv4Match = ipPart.match(ipv4Pattern);
+      
+      if (ipv4Match) {
+        const parts = ipv4Match.slice(1).map(Number);
+        if (parts.every(part => part >= 0 && part <= 255) && prefix >= 0 && prefix <= 32) {
+          return 'ipv4_range';
+        }
+      }
+      
+      // IPv6 CIDR (e.g., 2001:db8::/32)
+      const ipv6Patterns = [
+        /^([0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}$/,
+        /^::1$/,
+        /^::$/,
+        /^([0-9a-fA-F]{1,4}:){1,7}:$/,
+        /^:([0-9a-fA-F]{1,4}:){1,7}$/,
+        /^([0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}$/,
+        /^::ffff:\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/
+      ];
+      
+      if (ipv6Patterns.some(pattern => pattern.test(ipPart)) || ipPart.includes('::')) {
+        if (prefix >= 0 && prefix <= 128) {
+          return 'ipv6_range';
+        }
+      }
+      
+      return 'invalid';
+    }
     
     // IPv4 pattern
     const ipv4Pattern = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/;
@@ -334,7 +373,7 @@ export class IPRestrictionService {
   /**
    * Valida formato de IP
    */
-  static validateIPFormat(ip: string): { valid: boolean; type?: 'ipv4' | 'ipv6'; error?: string } {
+  static validateIPFormat(ip: string): { valid: boolean; type?: 'ipv4' | 'ipv6' | 'ipv4_range' | 'ipv6_range'; error?: string } {
     const trimmedIP = ip.trim();
     
     if (!trimmedIP) {
@@ -346,10 +385,112 @@ export class IPRestrictionService {
     if (type === 'invalid') {
       return { 
         valid: false, 
-        error: 'Formato de IP inválido. Exemplos válidos:\n• IPv4: 192.168.1.1\n• IPv6: 2001:db8::1, ::1, ou ::ffff:192.168.1.1' 
+        error: 'Formato de IP inválido. Exemplos válidos:\n• IPv4: 192.168.1.1\n• IPv6: 2001:db8::1, ::1\n• Range IPv4: 192.168.1.0/24\n• Range IPv6: 2001:db8::/32' 
       };
     }
 
     return { valid: true, type };
+  }
+
+  /**
+   * Verifica se um IP está dentro de um range CIDR
+   */
+  static isIPInRange(ip: string, range: string): boolean {
+    if (!range.includes('/')) {
+      // Se não é um range, fazer comparação direta
+      return ip === range;
+    }
+
+    const [rangeIP, prefixStr] = range.split('/');
+    const prefix = parseInt(prefixStr);
+
+    // IPv4 range check
+    if (this.detectIPType(ip) === 'ipv4' && this.detectIPType(rangeIP) === 'ipv4') {
+      return this.isIPv4InRange(ip, rangeIP, prefix);
+    }
+
+    // IPv6 range check
+    if (this.detectIPType(ip) === 'ipv6' && this.detectIPType(rangeIP) === 'ipv6') {
+      return this.isIPv6InRange(ip, rangeIP, prefix);
+    }
+
+    return false;
+  }
+
+  /**
+   * Verifica se um IPv4 está dentro de um range CIDR
+   */
+  private static isIPv4InRange(ip: string, rangeIP: string, prefix: number): boolean {
+    const ipToNumber = (ipStr: string): number => {
+      const parts = ipStr.split('.').map(Number);
+      return (parts[0] << 24) + (parts[1] << 16) + (parts[2] << 8) + parts[3];
+    };
+
+    const ipNum = ipToNumber(ip);
+    const rangeNum = ipToNumber(rangeIP);
+    const mask = ~((1 << (32 - prefix)) - 1);
+
+    return (ipNum & mask) === (rangeNum & mask);
+  }
+
+  /**
+   * Verifica se um IPv6 está dentro de um range CIDR (implementação simplificada)
+   */
+  private static isIPv6InRange(ip: string, rangeIP: string, prefix: number): boolean {
+    // Para IPv6, implementação simplificada
+    // Em produção, seria recomendado usar uma biblioteca especializada
+    
+    // Normalizar ambos os IPs
+    const normalizeIPv6 = (ipv6: string): string => {
+      // Expandir :: para zeros completos
+      if (ipv6.includes('::')) {
+        const parts = ipv6.split('::');
+        const leftParts = parts[0] ? parts[0].split(':').filter(p => p !== '') : [];
+        const rightParts = parts[1] ? parts[1].split(':').filter(p => p !== '') : [];
+        const missingParts = 8 - leftParts.length - rightParts.length;
+        
+        if (missingParts > 0) {
+          const middleParts = Array(missingParts).fill('0000');
+          const allParts = [...leftParts, ...middleParts, ...rightParts];
+          return allParts.map(part => part.padStart(4, '0')).join(':');
+        }
+      }
+      
+      // Normalizar cada parte para 4 dígitos
+      const parts = ipv6.split(':');
+      if (parts.length === 8) {
+        return parts.map(part => part.padStart(4, '0')).join(':');
+      }
+      
+      return ipv6;
+    };
+
+    const normalizedIP = normalizeIPv6(ip);
+    const normalizedRange = normalizeIPv6(rangeIP);
+
+    // Converter para array de números para comparação bit a bit
+    const ipParts = normalizedIP.split(':').map(part => parseInt(part, 16));
+    const rangeParts = normalizedRange.split(':').map(part => parseInt(part, 16));
+
+    // Calcular quantos grupos de 16 bits precisamos comparar
+    const groupsToCheck = Math.floor(prefix / 16);
+    const remainingBits = prefix % 16;
+
+    // Comparar grupos completos
+    for (let i = 0; i < groupsToCheck; i++) {
+      if (ipParts[i] !== rangeParts[i]) {
+        return false;
+      }
+    }
+
+    // Comparar bits restantes no último grupo
+    if (remainingBits > 0 && groupsToCheck < 8) {
+      const mask = 0xFFFF << (16 - remainingBits);
+      if ((ipParts[groupsToCheck] & mask) !== (rangeParts[groupsToCheck] & mask)) {
+        return false;
+      }
+    }
+
+    return true;
   }
 }

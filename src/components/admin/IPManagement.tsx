@@ -206,7 +206,10 @@ const IPManagement = () => {
     if (ip) {
       setNewIP(ip);
       const ipType = IPRestrictionService.validateIPFormat(ip).type || 'unknown';
-      setNewDescription(`IP atual do administrador (${auth.currentUser?.email}) - ${ipType.toUpperCase()}`);
+      const typeDescription = ipType === 'ipv4_range' ? 'Range IPv4' :
+                             ipType === 'ipv6_range' ? 'Range IPv6' :
+                             ipType.toUpperCase();
+      setNewDescription(`IP atual do administrador (${auth.currentUser?.email}) - ${typeDescription}`);
     }
   };
 
@@ -214,12 +217,17 @@ const IPManagement = () => {
     return new Date(dateString).toLocaleString('pt-BR');
   };
 
-  const getIPTypeIcon = (type: 'ipv4' | 'ipv6') => {
-    return type === 'ipv4' ? (
-      <span className="text-xs bg-blue-600 text-blue-100 px-2 py-1 rounded-full">IPv4</span>
-    ) : (
-      <span className="text-xs bg-purple-600 text-purple-100 px-2 py-1 rounded-full">IPv6</span>
-    );
+  const getIPTypeIcon = (type: string) => {
+    if (type === 'ipv4') {
+      return <span className="text-xs bg-blue-600 text-blue-100 px-2 py-1 rounded-full">IPv4</span>;
+    } else if (type === 'ipv6') {
+      return <span className="text-xs bg-purple-600 text-purple-100 px-2 py-1 rounded-full">IPv6</span>;
+    } else if (type === 'ipv4_range') {
+      return <span className="text-xs bg-green-600 text-green-100 px-2 py-1 rounded-full">IPv4 Range</span>;
+    } else if (type === 'ipv6_range') {
+      return <span className="text-xs bg-orange-600 text-orange-100 px-2 py-1 rounded-full">IPv6 Range</span>;
+    }
+    return <span className="text-xs bg-gray-600 text-gray-100 px-2 py-1 rounded-full">Unknown</span>;
   };
 
   if (loading) {
@@ -391,7 +399,7 @@ const IPManagement = () => {
               disabled={adding}
             />
             <p className="text-xs text-gray-400 mt-1">
-              Exemplos: 192.168.1.1 (IPv4) ou 2001:db8::1 (IPv6)
+              Exemplos: 192.168.1.1 (IPv4), 2001:db8::1 (IPv6), 192.168.1.0/24 (Range IPv4), 2001:db8::/32 (Range IPv6)
             </p>
             {newIP.trim() && (
               <div className="mt-2">
@@ -400,7 +408,11 @@ const IPManagement = () => {
                   return validation.valid ? (
                     <div className="flex items-center gap-2 text-green-400 text-xs">
                       <CheckCircle size={12} />
-                      <span>IP válido ({validation.type?.toUpperCase()})</span>
+                      <span>
+                        {validation.type === 'ipv4_range' ? 'Range IPv4 válido' :
+                         validation.type === 'ipv6_range' ? 'Range IPv6 válido' :
+                         `IP válido (${validation.type?.toUpperCase()})`}
+                      </span>
                     </div>
                   ) : (
                     <div className="flex items-center gap-2 text-red-400 text-xs">

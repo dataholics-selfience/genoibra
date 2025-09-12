@@ -137,6 +137,45 @@ function detectIPType(ip) {
   
   const cleanIP = ip.trim();
   
+  // Check for CIDR notation (ranges)
+  if (cleanIP.includes('/')) {
+    const [ipPart, prefixPart] = cleanIP.split('/');
+    const prefix = parseInt(prefixPart);
+    
+    // Validate prefix length
+    if (isNaN(prefix)) return 'invalid';
+    
+    // IPv4 CIDR (e.g., 192.168.1.0/24)
+    const ipv4Pattern = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/;
+    const ipv4Match = ipPart.match(ipv4Pattern);
+    
+    if (ipv4Match) {
+      const parts = ipv4Match.slice(1).map(Number);
+      if (parts.every(part => part >= 0 && part <= 255) && prefix >= 0 && prefix <= 32) {
+        return 'ipv4_range';
+      }
+    }
+    
+    // IPv6 CIDR (e.g., 2001:db8::/32)
+    const ipv6Patterns = [
+      /^([0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}$/,
+      /^::1$/,
+      /^::$/,
+      /^([0-9a-fA-F]{1,4}:){1,7}:$/,
+      /^:([0-9a-fA-F]{1,4}:){1,7}$/,
+      /^([0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}$/,
+      /^::ffff:\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/
+    ];
+    
+    if (ipv6Patterns.some(pattern => pattern.test(ipPart)) || ipPart.includes('::')) {
+      if (prefix >= 0 && prefix <= 128) {
+        return 'ipv6_range';
+      }
+    }
+    
+    return 'invalid';
+  }
+  
   // IPv4 pattern mais rigoroso
   const ipv4Pattern = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/;
   const ipv4Match = cleanIP.match(ipv4Pattern);
@@ -167,15 +206,97 @@ function detectIPType(ip) {
 }
 
 /**
+ * Verifica se um IP está dentro de um range CIDR
+ */
+function isIPInRange(ip, range) {
+  if (!range.includes('/')) {
+    // Se não é um range, fazer comparação direta
+    return ip === range;
+  }
+
+  const [rangeIP, prefixStr] = range.split('/');
+  const prefix = parseInt(prefixStr);
+
+  // IPv4 range check
+  if (detectIPType(ip) === 'ipv4' && detectIPType(rangeIP) === 'ipv4') {
+    return isIPv4InRange(ip, rangeIP, prefix);
+  }
+
+  // IPv6 range check
+  if (detectIPType(ip) === 'ipv6' && detectIPType(rangeIP) === 'ipv6') {
+    return isIPv6InRange(ip, rangeIP, prefix);
+  }
+
+  return false;
+}
+
+/**
+ * Verifica se um IPv4 está dentro de um range CIDR
+ */
+function isIPv4InRange(ip, rangeIP, prefix) {
+  const ipToNumber = (ipStr) => {
+    const parts = ipStr.split('.').map(Number);
+    return (parts[0] << 24) + (parts[1] << 16) + (parts[2] << 8) + parts[3];
+  };
+
+  const ipNum = ipToNumber(ip);
+  const rangeNum = ipToNumber(rangeIP);
+  const mask = ~((1 << (32 - prefix)) - 1);
+
+  return (ipNum & mask) === (rangeNum & mask);
+}
+
+/**
+ * Verifica se um IPv6 está dentro de um range CIDR (implementação simplificada)
+ */
+function isIPv6InRange(ip, rangeIP, prefix) {
+  // Normalizar ambos os IPs
+  const normalizedIP = normalizeIPv6(ip);
+  const normalizedRange = normalizeIPv6(rangeIP);
+
+  // Converter para array de números para comparação bit a bit
+  const ipParts = normalizedIP.split(':').map(part => parseInt(part, 16));
+  const rangeParts = normalizedRange.split(':').map(part => parseInt(part, 16));
+
+  // Calcular quantos grupos de 16 bits precisamos comparar
+  const groupsToCheck = Math.floor(prefix / 16);
+  const remainingBits = prefix % 16;
+
+  // Comparar grupos completos
+  for (let i = 0; i < groupsToCheck; i++) {
+    if (ipParts[i] !== rangeParts[i]) {
+      return false;
+    }
+  }
+
+  // Comparar bits restantes no último grupo
+  if (remainingBits > 0 && groupsToCheck < 8) {
+    const mask = 0xFFFF << (16 - remainingBits);
+    if ((ipParts[groupsToCheck] & mask) !== (rangeParts[groupsToCheck] & mask)) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+/**
  * Compara dois IPs considerando normalização
  */
-function compareIPs(clientIP, allowedIP) {
-  if (!clientIP || !allowedIP) return false;
+function compareIPs(clientIP, allowedIPOrRange) {
+  if (!clientIP || !allowedIPOrRange) return false;
   
   const clientType = detectIPType(clientIP);
-  const allowedType = detectIPType(allowedIP);
+  const allowedType = detectIPType(allowedIPOrRange);
   
-  console.log(`🔍 Comparando IPs: ${clientIP} (${clientType}) vs ${allowedIP} (${allowedType})`);
+  console.log(`🔍 Comparando IPs: ${clientIP} (${clientType}) vs ${allowedIPOrRange} (${allowedType})`);
+  
+  // Se é um range, usar verificação de range
+  if (allowedType === 'ipv4_range' || allowedType === 'ipv6_range') {
+    const isInRange = isIPInRange(clientIP, allowedIPOrRange);
+    console.log(`🎯 Verificação de range: ${clientIP} em ${allowedIPOrRange} = ${isInRange}`);
+    return isInRange;
+  }
   
   // Se tipos diferentes, não podem ser iguais
   if (clientType !== allowedType) {
@@ -185,15 +306,15 @@ function compareIPs(clientIP, allowedIP) {
   
   if (clientType === 'ipv4') {
     // Comparação direta para IPv4
-    const match = clientIP.trim() === allowedIP.trim();
-    console.log(`IPv4 match: "${clientIP}" === "${allowedIP}" = ${match}`);
+    const match = clientIP.trim() === allowedIPOrRange.trim();
+    console.log(`IPv4 match: "${clientIP}" === "${allowedIPOrRange}" = ${match}`);
     return match;
   }
   
   if (clientType === 'ipv6') {
     // Normalizar ambos os IPv6 antes de comparar
     const normalizedClient = normalizeIPv6(clientIP);
-    const normalizedAllowed = normalizeIPv6(allowedIP);
+    const normalizedAllowed = normalizeIPv6(allowedIPOrRange);
     const match = normalizedClient === normalizedAllowed;
     console.log(`IPv6 match: "${normalizedClient}" === "${normalizedAllowed}" = ${match}`);
     return match;
