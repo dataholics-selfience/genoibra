@@ -209,24 +209,42 @@ function detectIPType(ip) {
  * Verifica se um IP está dentro de um range CIDR
  */
 function isIPInRange(ip, range) {
+  console.log(`🎯 Verificando se IP ${ip} está no range ${range}`);
+  
   if (!range.includes('/')) {
     // Se não é um range, fazer comparação direta
+    const directMatch = ip === range;
+    console.log(`  📍 Comparação direta: ${ip} === ${range} = ${directMatch}`);
     return ip === range;
   }
 
   const [rangeIP, prefixStr] = range.split('/');
   const prefix = parseInt(prefixStr);
+  
+  console.log(`  📊 Range decomposto: IP=${rangeIP}, Prefix=${prefix}`);
 
   // IPv4 range check
-  if (detectIPType(ip) === 'ipv4' && detectIPType(rangeIP) === 'ipv4') {
-    return isIPv4InRange(ip, rangeIP, prefix);
+  const ipType = detectIPType(ip);
+  const rangeType = detectIPType(rangeIP);
+  
+  console.log(`  🔍 Tipos: IP=${ipType}, Range=${rangeType}`);
+  
+  if (ipType === 'ipv4' && rangeType === 'ipv4') {
+    console.log(`  🔢 Verificando range IPv4...`);
+    const result = isIPv4InRange(ip, rangeIP, prefix);
+    console.log(`  ✅ Resultado IPv4: ${result}`);
+    return result;
   }
 
   // IPv6 range check
-  if (detectIPType(ip) === 'ipv6' && detectIPType(rangeIP) === 'ipv6') {
-    return isIPv6InRange(ip, rangeIP, prefix);
+  if (ipType === 'ipv6' && rangeType === 'ipv6') {
+    console.log(`  🔢 Verificando range IPv6...`);
+    const result = isIPv6InRange(ip, rangeIP, prefix);
+    console.log(`  ✅ Resultado IPv6: ${result}`);
+    return result;
   }
 
+  console.log(`  ❌ Tipos incompatíveis: ${ipType} vs ${rangeType}`);
   return false;
 }
 
@@ -234,16 +252,27 @@ function isIPInRange(ip, range) {
  * Verifica se um IPv4 está dentro de um range CIDR
  */
 function isIPv4InRange(ip, rangeIP, prefix) {
+  console.log(`    🔢 Calculando range IPv4: ${ip} em ${rangeIP}/${prefix}`);
+  
   const ipToNumber = (ipStr) => {
     const parts = ipStr.split('.').map(Number);
-    return (parts[0] << 24) + (parts[1] << 16) + (parts[2] << 8) + parts[3];
+    // Usar >>> 0 para garantir número unsigned de 32 bits
+    return ((parts[0] << 24) + (parts[1] << 16) + (parts[2] << 8) + parts[3]) >>> 0;
   };
 
   const ipNum = ipToNumber(ip);
   const rangeNum = ipToNumber(rangeIP);
-  const mask = ~((1 << (32 - prefix)) - 1);
+  const mask = (~((1 << (32 - prefix)) - 1)) >>> 0; // Garantir unsigned
+  
+  console.log(`    📊 Números: IP=${ipNum}, Range=${rangeNum}, Mask=${mask.toString(16)}`);
+  console.log(`    🔍 IP & Mask = ${(ipNum & mask) >>> 0}, Range & Mask = ${(rangeNum & mask) >>> 0}`);
 
-  return (ipNum & mask) === (rangeNum & mask);
+  const ipMasked = (ipNum & mask) >>> 0;
+  const rangeMasked = (rangeNum & mask) >>> 0;
+  const result = ipMasked === rangeMasked;
+  
+  console.log(`    ✅ Resultado final IPv4: ${result}`);
+  return result;
 }
 
 /**
