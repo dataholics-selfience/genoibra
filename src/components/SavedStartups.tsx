@@ -741,7 +741,7 @@ const SavedStartups = () => {
       <div className="p-4 lg:p-8">
         <div className="max-w-7xl mx-auto">
           {totalStartupCount === 0 ? (
-            <EmptyPipelineSection />
+            <EmptyPipelineSection navigate={navigate} />
           ) : (
             <>
               {publicRegistrations > 0 && (
@@ -774,19 +774,24 @@ const SavedStartups = () => {
   );
 };
 
-const ChallengeButton = ({ challenge }: { challenge: any }) => {
+const ChallengeButton = ({ challenge, navigate }: { challenge: any; navigate: (path: string) => void }) => {
+  const handleChallengeClick = () => {
+    // Navigate directly to home and let Layout handle challenge selection
+    navigate('/', { state: { challengeId: challenge.id } });
+  };
+
   return (
-    <Link
-      to={`/challenge/${challenge.slug || challenge.id}`}
+    <button
+      onClick={handleChallengeClick}
       className="bg-purple-600 hover:bg-purple-700 text-white px-6 py-3 rounded-lg font-medium transition-colors flex items-center gap-2"
     >
       <Target size={20} />
       {challenge.title}
-    </Link>
+    </button>
   );
 };
 
-const EmptyPipelineSection = () => {
+const EmptyPipelineSection = ({ navigate }: { navigate: (path: string) => void }) => {
   const [challenges, setChallenges] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -828,8 +833,7 @@ const EmptyPipelineSection = () => {
       <FolderOpen size={64} className="text-gray-600 mx-auto mb-4" />
       <h3 className="text-xl font-bold text-white mb-2">Pipeline vazio</h3>
       <p className="text-gray-400 mb-6">
-        Você ainda não tem startups no seu pipeline. Crie desafios para atrair startups 
-        ou aguarde inscrições em seus desafios públicos.
+        Você ainda não tem startups no seu pipeline. Crie desafios novos ou siga interagindo em seus desafios já criados até gerar suas indicações de startups.
       </p>
       <div className="flex flex-col sm:flex-row gap-4 justify-center">
         {challenges.length > 0 && (
@@ -837,7 +841,7 @@ const EmptyPipelineSection = () => {
             <h4 className="text-lg font-medium text-white">Seus Desafios:</h4>
             <div className="flex flex-wrap gap-3 justify-center">
               {challenges.map((challenge) => (
-                <ChallengeButton key={challenge.id} challenge={challenge} />
+                <ChallengeButton key={challenge.id} challenge={challenge} navigate={navigate} />
               ))}
             </div>
           </div>
