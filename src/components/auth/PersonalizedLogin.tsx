@@ -123,7 +123,7 @@ const PersonalizedLogin = () => {
     try {
       const verificationCode = generateVerificationCode();
       const now = new Date();
-      const expiresAt = new Date(now.getTime() + 3 * 60 * 1000); // 3 minutos
+      const expiresAt = new Date(now.getTime() + 15 * 60 * 1000); // 15 minutos
 
       console.log('📧 Enviando código de verificação:', { email: userData.email, code: verificationCode });
 
@@ -171,7 +171,7 @@ const PersonalizedLogin = () => {
               
               <div style="background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 6px; padding: 15px; margin: 20px 0;">
                 <p style="margin: 0; color: #856404; font-size: 14px;">
-                  <strong>⚠️ Importante:</strong> Este código expira em 3 minutos. 
+                  <strong>⚠️ Importante:</strong> Este código expira em 15 minutos. 
                   Se não conseguir usar a tempo, solicite um novo código.
                 </p>
               </div>
@@ -202,7 +202,7 @@ const PersonalizedLogin = () => {
         },
         subject: `Código de Login Gen.OI: ${verificationCode}`,
         html: emailHtml,
-        text: `Seu código de login Gen.OI: ${verificationCode}\n\nEste código expira em 3 minutos.`,
+        `Seu código de login Gen.OI: ${verificationCode}\n\nEste código expira em 15 minutos.`,
         reply_to: { 
           email: 'noreply@genoi.com.br', 
           name: 'Gen.OI - Suporte' 
@@ -223,7 +223,7 @@ const PersonalizedLogin = () => {
         { email: userData.email, name: userData.email.split('@')[0] },
         `Código de Login Gen.OI: ${verificationCode}`,
         emailHtml,
-        `Seu código de login Gen.OI: ${verificationCode}\n\nEste código expira em 3 minutos.`,
+        `Seu código de login Gen.OI: ${verificationCode}\n\nEste código expira em 15 minutos.`,
         ['auth', 'login-code'],
         { 
           userId: userData.uid,
@@ -240,7 +240,7 @@ const PersonalizedLogin = () => {
       console.log('✅ Email de login enviado com sucesso:', emailResult.docId);
 
       setCodeSent(true);
-      setCountdown(180); // 3 minutos
+      setCountdown(900); // 15 minutos
       setSuccess('Código enviado! Verifique seu email.');
       
       // Clear success message after 3 seconds
@@ -581,7 +581,7 @@ const PersonalizedLogin = () => {
               <ul className="text-blue-100 text-sm space-y-1">
                 <li>• Digite sua senha e clique em "Enviar Código por Email"</li>
                 <li>• Verifique seu email e digite o código de 6 caracteres</li>
-                <li>• O código expira em 3 minutos</li>
+                <li>• O código expira em 15 minutos</li>
                 <li>• Clique em "Entrar" para acessar a plataforma</li>
               </ul>
             </div>

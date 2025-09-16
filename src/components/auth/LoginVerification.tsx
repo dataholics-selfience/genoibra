@@ -125,7 +125,7 @@ const LoginVerification = () => {
     try {
       const verificationCode = generateVerificationCode();
       const now = new Date();
-      const expiresAt = new Date(now.getTime() + 5 * 60 * 1000); // 5 minutes
+      const expiresAt = new Date(now.getTime() + 15 * 60 * 1000); // 15 minutes
 
       console.log('📧 Enviando código de verificação de login:', { 
         email: auth.currentUser.email, 
@@ -181,7 +181,7 @@ const LoginVerification = () => {
               
               <div style="background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 6px; padding: 15px; margin: 20px 0;">
                 <p style="margin: 0; color: #856404; font-size: 14px;">
-                  <strong>⚠️ Importante:</strong> Este código expira em 5 minutos. 
+                  <strong>⚠️ Importante:</strong> Este código expira em 15 minutos. 
                   Se não conseguir usar a tempo, você pode solicitar um novo código.
                 </p>
               </div>
@@ -215,7 +215,7 @@ const LoginVerification = () => {
         { email: auth.currentUser.email!, name: auth.currentUser.email!.split('@')[0] },
         `🔐 Código de Verificação Gen.OI: ${verificationCode}`,
         emailHtml,
-        `Código de verificação de segurança Gen.OI: ${verificationCode}\n\nEste código expira em 5 minutos.\n\nSe você não solicitou este código, ignore este email.`,
+        `Código de verificação de segurança Gen.OI: ${verificationCode}\n\nEste código expira em 15 minutos.\n\nSe você não solicitou este código, ignore este email.`,
         ['security', 'login-verification'],
         { 
           userId: auth.currentUser.uid,
@@ -232,7 +232,7 @@ const LoginVerification = () => {
       console.log('✅ Email de verificação enviado com sucesso:', emailResult.docId);
 
       setAttempts(prev => prev + 1);
-      setCountdown(300); // 5 minutes
+      setCountdown(900); // 15 minutes
       setEmailSent(true);
       setSuccess('Código de verificação enviado! Verifique seu email.');
       
@@ -498,7 +498,7 @@ const LoginVerification = () => {
           <ul className="text-blue-100 text-sm space-y-1">
             <li>• Digite o código de 6 dígitos e clique em "Enviar Email de Verificação"</li>
             <li>• Verifique seu email e digite o código recebido</li>
-            <li>• O código expira em 5 minutos</li>
+            <li>• O código expira em 15 minutos</li>
             <li>• Você tem até 3 tentativas para solicitar novos códigos</li>
             <li>• Após 3 tentativas, aguarde 5 minutos para tentar novamente</li>
             <li>• Nunca compartilhe este código com terceiros</li>
