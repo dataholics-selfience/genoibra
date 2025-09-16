@@ -18,15 +18,12 @@ import SudoAdminInterface from './components/admin/SudoAdminInterface';
 import TokenRegister from './components/auth/TokenRegister';
 import SlugRegister from './components/auth/SlugRegister';
 import PublicChallenge from './components/PublicChallenge';
-import LoginVerification from './components/auth/LoginVerification';
 import StartupDetailView from './components/StartupDetailView';
-import { needsLoginVerification, clearVerificationState } from './utils/verificationStateManager';
 
 function App() {
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [languageInitialized, setLanguageInitialized] = useState(false);
-  const [needsVerification, setNeedsVerification] = useState(false);
 
   useEffect(() => {
     // Initialize language detection
@@ -55,33 +52,15 @@ function App() {
           } else {
             setUser(user);
             
-            // Check if user needs login verification (except admin)
-            if (user.email !== 'daniel.mendes@dataholics.io') {
-              const needsVerif = needsLoginVerification(user.uid);
-              setNeedsVerification(needsVerif);
-              console.log(`🔐 Verificação de login necessária para ${user.email}:`, needsVerif);
-              
-              // If verification is complete, ensure we don't show verification screen
-              if (!needsVerif) {
-                setNeedsVerification(false);
-              }
-            } else {
-              console.log('🔓 Admin user detected, skipping verification');
-              setNeedsVerification(false);
-            }
+            // Login direto sem verificação de 2 etapas
+            console.log('🔓 Login direto sem verificação de 2 etapas para:', user.email);
           }
         } catch (error) {
           console.error('Error checking user status:', error);
           setUser(user);
-          setNeedsVerification(false);
         }
       } else {
         setUser(null);
-        setNeedsVerification(false);
-        // Clear verification state on logout
-        if (user) {
-          clearVerificationState(user.uid);
-        }
       }
       setLoading(false);
     });
@@ -97,17 +76,6 @@ function App() {
     );
   }
 
-  // Show login verification if user is authenticated but needs verification
-  if (user && needsVerification) {
-    return (
-      <Router>
-        <Routes>
-          <Route path="/login-verification" element={<LoginVerification />} />
-          <Route path="*" element={<LoginVerification />} />
-        </Routes>
-      </Router>
-    );
-  }
   return (
     <Router>
       <Routes>
@@ -118,7 +86,6 @@ function App() {
         <Route path="/invite/:slug" element={!user ? <SlugRegister /> : <Navigate to="/" replace />} />
         <Route path="/forgot-password" element={!user ? <ForgotPassword /> : <Navigate to="/" replace />} />
         <Route path="/challenge/:slug" element={<PublicChallenge />} />
-        <Route path="/login-verification" element={user ? <LoginVerification /> : <Navigate to="/login" replace />} />
         
         {/* Protected Routes */}
         <Route path="/profile" element={user ? <UserManagement /> : <Navigate to="/login" replace />} />
