@@ -389,7 +389,18 @@ const StartupList = () => {
     if (selectedStartup) {
       setSelectedStartup(null);
     } else {
-      navigate('/');
+      // Voltar para o chat interface do desafio atual
+      if (currentChallenge) {
+        navigate('/', { state: { challengeId: currentChallenge.id } });
+      } else {
+        // Fallback: tentar usar o challengeId do localStorage
+        const storedChallengeId = localStorage.getItem('current-challenge-id');
+        if (storedChallengeId) {
+          navigate('/', { state: { challengeId: storedChallengeId } });
+        } else {
+          navigate('/');
+        }
+      }
     }
   };
 
