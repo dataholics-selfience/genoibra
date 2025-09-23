@@ -4,6 +4,7 @@ import {
   Star, Calendar, Building2, MapPin, Users, Briefcase, Award, 
   Target, Rocket, ArrowLeft, Globe, Box, Linkedin,
   Facebook, Twitter, Instagram, Trash2, FolderOpen, Plus, Check, X, BarChart3, Settings
+  Mail
 } from 'lucide-react';
 import { collection, query, where, getDocs, deleteDoc, doc, updateDoc, getDoc, addDoc } from 'firebase/firestore';
 import { db, auth } from '../firebase';
@@ -11,7 +12,6 @@ import { StartupType, SocialLink } from '../types';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import PipelineStageManager from './PipelineStageManager';
-import { Link } from 'react-router-dom';
 
 interface SavedStartupType {
   id: string;
@@ -591,6 +591,10 @@ const SavedStartups = () => {
     setSelectedStartup(startup);
   };
 
+  const handleStartupClick = (startupId: string) => {
+    navigate(`/startup/${startupId}`);
+  };
+
   const handleBack = () => {
     if (selectedStartup) {
       setSelectedStartup(null);
@@ -762,7 +766,7 @@ const SavedStartups = () => {
                 startups={savedStartups}
                 stages={pipelineStages}
                 onStageChange={handleStageChange}
-                onStartupClick={() => {}} // Remove click functionality
+                onStartupClick={handleStartupClick}
                 onRemoveStartup={handleRemoveStartup}
                 onDeleteStage={handleDeleteStage}
               />
