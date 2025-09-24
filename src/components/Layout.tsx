@@ -111,8 +111,6 @@ const Layout = () => {
 
   const selectChallenge = (challengeId: string) => {
     setCurrentChallengeId(challengeId);
-    // Store current challenge ID for language change functionality
-    localStorage.setItem('current-challenge-id', challengeId);
     setIsSidebarOpen(false);
   };
 
