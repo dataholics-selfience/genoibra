@@ -159,7 +159,7 @@ const StartupDetailView = () => {
 
 
   const handleBack = () => {
-    navigate('/startups');
+    navigate(-1);
   };
 
   if (loading) {

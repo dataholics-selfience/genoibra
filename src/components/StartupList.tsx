@@ -136,8 +136,8 @@ const StartupList = () => {
       setSelectedStartup(null);
       setSelectedStartupChallengeTitle('');
     } else {
-      // Voltar para o chat principal
-      navigate('/');
+      // Voltar para a página anterior
+      navigate(-1);
     }
   };
 
