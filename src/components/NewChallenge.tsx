@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Loader2, Upload, X, Copy, Check, Globe, ExternalLink } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';

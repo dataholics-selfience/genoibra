@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import { useLocation } from 'react-router-dom';
 import { collection, query, orderBy, onSnapshot, addDoc, where, getDocs } from 'firebase/firestore';
 import { db, auth } from '../firebase';
 import EnvironmentSelector from './EnvironmentSelector';
@@ -16,25 +15,12 @@ const welcomeMessages = [
 ];
 
 const Layout = () => {
-  const location = useLocation();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [webhookEnvironment, setWebhookEnvironment] = useState<'production' | 'test'>('production');
   const [messages, setMessages] = useState<MessageType[]>([]);
   const [challenges, setChallenges] = useState<ChallengeType[]>([]);
   const [currentChallengeId, setCurrentChallengeId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-
-  // Handle challenge selection from navigation state
-  useEffect(() => {
-    const challengeIdFromState = location.state?.challengeId;
-    if (challengeIdFromState && challenges.length > 0) {
-      const challengeExists = challenges.find(c => c.id === challengeIdFromState);
-      if (challengeExists) {
-        setCurrentChallengeId(challengeIdFromState);
-        localStorage.setItem('current-challenge-id', challengeIdFromState);
-      }
-    }
-  }, [location.state, challenges]);
 
   useEffect(() => {
     if (!auth.currentUser) {
