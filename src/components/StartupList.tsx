@@ -117,14 +117,16 @@ const StartupList = () => {
       try {
         const q = query(
           collection(db, 'startupLists'),
-          where('userId', '==', auth.currentUser.uid),
-          orderBy('createdAt', 'desc')
+          where('userId', '==', auth.currentUser.uid)
         );
         const querySnapshot = await getDocs(q);
         const lists = querySnapshot.docs.map(doc => ({
           id: doc.id,
           ...doc.data()
         })) as StartupListType[];
+        
+        // Sort in memory to avoid composite index requirement
+        lists.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
         
         setStartupLists(lists);
       } catch (error) {
