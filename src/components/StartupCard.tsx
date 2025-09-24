@@ -105,7 +105,7 @@ const StartupCard = ({ startup, challengeTitle, onClose }: StartupCardProps) => 
       <div className="bg-white rounded-lg max-w-6xl w-full max-h-[90vh] overflow-auto">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-200">
-          <h2 className="text-2xl font-bold text-gray-800">Card da Startup</h2>
+          <h2 className="text-2xl font-bold text-gray-800">{challengeTitle}</h2>
           <div className="flex items-center gap-4">
             <button
               onClick={generateCard}
@@ -152,7 +152,7 @@ const StartupCard = ({ startup, challengeTitle, onClose }: StartupCardProps) => 
             <div className="flex justify-between items-start mb-6">
               <div>
                 <h1 className="text-2xl font-bold text-red-600 mb-2">
-                  {challengeTitle || 'Employee Experience e People Analytics'}
+                  {challengeTitle}
                 </h1>
               </div>
               <div className="flex items-center gap-4">
